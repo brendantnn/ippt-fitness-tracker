@@ -6,6 +6,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.ippt.screens.HomeScreen
 import com.example.ippt.screens.PushupScreen
+import com.example.ippt.screens.PushupTrackerScreen
 import com.example.ippt.screens.RunScreen
 
 
@@ -19,5 +20,7 @@ fun NavGraph() {
         composable("home") { HomeScreen(navController) }
         composable("pushup") { PushupScreen(navController) }
         composable("run") { RunScreen(navController) }
+        composable("pushup_tracker") { PushupTrackerScreen(navController) }
+
     }
 }
