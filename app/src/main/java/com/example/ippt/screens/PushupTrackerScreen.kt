@@ -44,8 +44,14 @@ fun PushupTrackerScreen(navController: NavController) {
     var hasCameraPermission by remember { mutableStateOf(false) }
     var pushUpCount by remember { mutableStateOf(0) }
     var elbowAngle by remember { mutableStateOf(0.0) }
+    var backAngle by remember { mutableStateOf(0.0) }
+    var legAngle by remember { mutableStateOf(0.0) }
+
     var hipAngle by remember { mutableStateOf(0.0) }
     var keyPoints by remember { mutableStateOf(emptyList<Pair<Float, Float>>()) }
+    var isUserReady by remember { mutableStateOf(false) }
+    var isBackStraight by remember { mutableStateOf(true) }
+
 
     // Request camera permission
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
@@ -53,7 +59,7 @@ fun PushupTrackerScreen(navController: NavController) {
     ) { granted ->
         hasCameraPermission = granted
         if (granted) {
-            isCameraOn = true  // Add this line
+            isCameraOn = true
         }
     }
 
@@ -61,7 +67,6 @@ fun PushupTrackerScreen(navController: NavController) {
         if (ContextCompat.checkSelfPermission(context, android.Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
             hasCameraPermission = true
             isCameraOn = true
-
         } else {
             cameraPermissionLauncher.launch(android.Manifest.permission.CAMERA)
         }
@@ -71,59 +76,153 @@ fun PushupTrackerScreen(navController: NavController) {
         if (hasCameraPermission) {
             if (isCameraOn) {
                 val lifecycleOwner = LocalLifecycleOwner.current
-                CameraPreview(context, lifecycleOwner, cameraExecutor) { newCount, newElbowAngle, newHipAngle, newKeyPoints ->
-                    pushUpCount = newCount
-                    elbowAngle = newElbowAngle
-                    hipAngle = newHipAngle
-                    keyPoints = newKeyPoints
+                CameraPreview(context, lifecycleOwner, cameraExecutor) { newCount, newElbowAngle, newHipAngle, newKeyPoints, backStraight ->
+                    if (isUserReady) {
+                        pushUpCount = newCount
+                        elbowAngle = newElbowAngle
+                        hipAngle = newHipAngle
+                        keyPoints = newKeyPoints
+                        isBackStraight = backStraight  // ✅ Track back straightness
+
+                    } else {
+                        // Detect if user is in a push-up position
+                        if (newElbowAngle in 160.0..200.0 && newHipAngle in 160.0..200.0) {
+                            isUserReady = true
+                        }
+                    }
                 }
             }
         } else {
             Text("Camera permission is required to use this feature.", modifier = Modifier.align(Alignment.Center))
         }
 
-        // ✅ Display Push-Up Count
-        Text(
-            text = "Push-ups: $pushUpCount",
-            style = MaterialTheme.typography.headlineMedium,
-            modifier = Modifier.align(Alignment.TopCenter).padding(top = 32.dp)
-        )
+        // ✅ Top Section Overlay
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(150.dp)
+                .background(MaterialTheme.colorScheme.background.copy(alpha = 0.8f)) // Semi-transparent background
+                .align(Alignment.TopCenter)
+                .padding(16.dp)
+        ) {
+            if (!isUserReady) {
+                // Show instruction
+                Text(
+                    text = "Please get into push-up position",
+                    style = MaterialTheme.typography.headlineMedium,
+                    modifier = Modifier.align(Alignment.Center)
+                )
+            } else {
 
-        // ✅ Display Elbow and Hip Angles
-        Column(modifier = Modifier.align(Alignment.TopStart).padding(16.dp)) {
-            Text(text = "Elbow Angle: ${elbowAngle.toInt()}°", style = MaterialTheme.typography.bodyLarge)
-            Text(text = "Hip Angle: ${hipAngle.toInt()}°", style = MaterialTheme.typography.bodyLarge)
+                // ✅ Display angles, skeleton visualization, and push-up count
+                Row(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    // Elbow and Hip Angles on the Left
+                    Column(
+                        horizontalAlignment = Alignment.Start
+                    ) {
+                        Text(text = "Elbow Angle: ${elbowAngle.toInt()}°", style = MaterialTheme.typography.bodyLarge)
+                        Text(text = "Hip Angle: ${hipAngle.toInt()}°", style = MaterialTheme.typography.bodyLarge)
+                    }
+
+                    // Skeleton Visualization in the Center
+                    Box(
+                        modifier = Modifier
+                            .size(100.dp)
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        DrawSkeletonLines(
+                            keyPoints = keyPoints,
+                            lineColor = MaterialTheme.colorScheme.secondary,
+                            boxSize = 80f  // Leave some padding inside the circle
+                        )
+                    }
+
+
+
+                    // Push-Up Count on the Right
+                    Text(
+                        text = "Push-ups: $pushUpCount",
+                        style = MaterialTheme.typography.headlineMedium,
+                        modifier = Modifier.align(Alignment.CenterVertically)
+                    )
+                }
+            }
         }
 
-        // ✅ Draw Keypoints (Joints)
-        keyPoints.forEach { (x, y) ->
+        // Display a warning message if the user's back isn't straight
+        if (!isBackStraight) {
             Box(
                 modifier = Modifier
-                    .offset(x.dp, y.dp)
-                    .size(10.dp)
-                    .background(MaterialTheme.colorScheme.primary, CircleShape)
-            )
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.error.copy(alpha = 0.8f))
+                    .padding(16.dp)
+            ) {
+                Text(
+                    text = "Straighten back",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onError,
+                    modifier = Modifier.align(Alignment.Center)
+                )
+            }
         }
-
-        DrawSkeletonLines(keyPoints, lineColor = MaterialTheme.colorScheme.secondary)
-
-
     }
 }
 
 @Composable
-fun DrawSkeletonLines(keyPoints: List<Pair<Float, Float>>, lineColor: androidx.compose.ui.graphics.Color) {
+fun DrawSkeletonLines(
+    keyPoints: List<Pair<Float, Float>>,
+    lineColor: androidx.compose.ui.graphics.Color,
+    boxSize: Float // Size of the square drawing area inside the circle
+) {
     Canvas(modifier = Modifier.fillMaxSize()) {
-        keyPoints.chunked(2).forEach { (start, end) ->
+        if (keyPoints.isEmpty()) return@Canvas
+
+        // Find min and max points for scaling
+        val minX = keyPoints.minOf { it.first }
+        val maxX = keyPoints.maxOf { it.first }
+        val minY = keyPoints.minOf { it.second }
+        val maxY = keyPoints.maxOf { it.second }
+
+        val widthRange = maxX - minX
+        val heightRange = maxY - minY
+
+        // Calculate scale factor to maintain aspect ratio
+        val scale = if (widthRange > heightRange) {
+            boxSize / widthRange
+        } else {
+            boxSize / heightRange
+        }
+
+        // Center offsets
+        val centerX = size.width / 2
+        val centerY = size.height / 2
+
+        // Normalize and scale keypoints
+        val normalizedKeyPoints = keyPoints.map { (x, y) ->
+            val scaledX = ((x - minX) * scale) - (widthRange * scale / 2)
+            val scaledY = ((y - minY) * scale) - (heightRange * scale / 2)
+            Pair(centerX + scaledX, centerY + scaledY)
+        }
+
+        // Draw skeleton lines
+        normalizedKeyPoints.chunked(2).forEach { (start, end) ->
             drawLine(
                 color = lineColor,
                 start = Offset(start.first, start.second),
                 end = Offset(end.first, end.second),
-                strokeWidth = 5f
+                strokeWidth = 3f
             )
         }
     }
 }
+
+
 
 
 @SuppressLint("UnsafeOptInUsageError")
@@ -132,7 +231,7 @@ fun CameraPreview(
     context: Context,
     lifecycleOwner: LifecycleOwner,
     cameraExecutor: ExecutorService,
-    onDataUpdate: (Int, Double, Double, List<Pair<Float, Float>>) -> Unit  // ✅ Pass keypoints
+    onDataUpdate: (Int, Double, Double, List<Pair<Float, Float>>, Boolean) -> Unit  // ✅ Pass keypoints
 ) {
     AndroidView(
         modifier = Modifier.fillMaxSize(),
@@ -153,7 +252,7 @@ private fun startCamera(
     context: Context,
     lifecycleOwner: LifecycleOwner,
     cameraExecutor: ExecutorService,
-    onDataUpdate: (Int, Double, Double, List<Pair<Float, Float>>) -> Unit
+    onDataUpdate: (Int, Double, Double, List<Pair<Float, Float>>, Boolean) -> Unit
 ) {
     val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
 
@@ -171,7 +270,7 @@ private fun startCamera(
         }
 
         val cameraSelector = CameraSelector.Builder()
-            .requireLensFacing(CameraSelector.LENS_FACING_BACK)  // ✅ Switch to front camera
+            .requireLensFacing(CameraSelector.LENS_FACING_BACK)
             .build()
 
         cameraProvider.bindToLifecycle(lifecycleOwner, cameraSelector, preview, imageAnalyzer)
@@ -183,11 +282,12 @@ private fun startCamera(
 private var pushUpCount = 0  // ✅ Persist push-up count across frames
 private var isGoingDown = false  // ✅ Track downward movement
 private var wasGoingDown = false  // ✅ Prevent multiple counts
+private var backStraight = false
 
 private fun processPushUpDetection(
     imageProxy: ImageProxy,
     context: Context,
-    onDataUpdate: (Int, Double, Double, List<Pair<Float, Float>>) -> Unit  // ✅ Send keypoints
+    onDataUpdate: (Int, Double, Double, List<Pair<Float, Float>>, Boolean) -> Unit  // ✅ Send keypoints
 ) {
     val mediaImage = imageProxy.image
     if (mediaImage != null) {
@@ -205,6 +305,17 @@ private fun processPushUpDetection(
                 if (landmarks.isNotEmpty()) {
                     val elbowAngle = getAngle(landmarks, PoseLandmark.LEFT_SHOULDER, PoseLandmark.LEFT_ELBOW, PoseLandmark.LEFT_WRIST)
                     val hipAngle = getAngle(landmarks, PoseLandmark.LEFT_SHOULDER, PoseLandmark.LEFT_HIP, PoseLandmark.LEFT_KNEE)
+                    val backAngle = getAngle(landmarks, PoseLandmark.LEFT_SHOULDER,  // A
+                        PoseLandmark.LEFT_HIP,       // B (Vertex)
+                        PoseLandmark.LEFT_KNEE       // C
+                    )
+
+                    val legAngle = getAngle(
+                        landmarks,
+                        PoseLandmark.LEFT_HIP,       // A
+                        PoseLandmark.LEFT_KNEE,      // B (Vertex)
+                        PoseLandmark.LEFT_ANKLE      // C
+                    )
 
                     // ✅ Extract keypoint positions for skeleton overlay
                     val keyPoints = listOf(
@@ -222,6 +333,12 @@ private fun processPushUpDetection(
                         }
                     }.flatten()
 
+                    if (backAngle in 170.0..190.0 && legAngle in 170.0..190.0) {
+                        backStraight = true
+                    } else {
+                        backStraight = false
+                    }
+
                     // ✅ Improved Push-Up Counting Logic
                     if (elbowAngle < 90 && hipAngle > 160) {
                         isGoingDown = true  // ✅ Detect downward motion
@@ -229,15 +346,14 @@ private fun processPushUpDetection(
                     }
 
                     // ✅ Count Only When Going Back Up After Fully Going Down
-                    if (wasGoingDown && isGoingDown && elbowAngle > 160 && hipAngle > 160) {
+                    if (wasGoingDown && isGoingDown && elbowAngle > 160 && hipAngle > 160 && backStraight) {
                         pushUpCount++  // ✅ Increment only after a full rep
                         isGoingDown = false  // ✅ Reset for next push-up
                         wasGoingDown = false  // ✅ Prevent multiple counts
-                        Log.d("PushupTracker", "Push-up Count Increased: $pushUpCount")  // ✅ Debugging Log
                     }
 
                     // ✅ Send push-up count, angles, and skeleton keypoints to UI
-                    onDataUpdate(pushUpCount, elbowAngle, hipAngle, keyPoints)
+                    onDataUpdate(pushUpCount, elbowAngle, hipAngle, keyPoints, backStraight)
                 }
             }
             .addOnFailureListener { e ->
