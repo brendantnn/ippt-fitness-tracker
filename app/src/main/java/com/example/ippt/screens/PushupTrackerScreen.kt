@@ -31,6 +31,7 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.pose.PoseDetection
 import com.google.mlkit.vision.pose.PoseLandmark
 import com.google.mlkit.vision.pose.accurate.AccuratePoseDetectorOptions
+import com.google.mlkit.vision.pose.defaults.PoseDetectorOptions
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlin.math.atan2
@@ -52,7 +53,7 @@ fun PushupTrackerScreen(navController: NavController) {
     ) { granted ->
         hasCameraPermission = granted
         if (granted) {
-            isCameraOn = true
+            isCameraOn = true  // Add this line
         }
     }
 
@@ -60,6 +61,7 @@ fun PushupTrackerScreen(navController: NavController) {
         if (ContextCompat.checkSelfPermission(context, android.Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
             hasCameraPermission = true
             isCameraOn = true
+
         } else {
             cameraPermissionLauncher.launch(android.Manifest.permission.CAMERA)
         }
@@ -80,30 +82,32 @@ fun PushupTrackerScreen(navController: NavController) {
             Text("Camera permission is required to use this feature.", modifier = Modifier.align(Alignment.Center))
         }
 
-        // Display Push-Up Count
+        // ✅ Display Push-Up Count
         Text(
             text = "Push-ups: $pushUpCount",
             style = MaterialTheme.typography.headlineMedium,
             modifier = Modifier.align(Alignment.TopCenter).padding(top = 32.dp)
         )
 
-        // Display Elbow and Hip Angles
+        // ✅ Display Elbow and Hip Angles
         Column(modifier = Modifier.align(Alignment.TopStart).padding(16.dp)) {
             Text(text = "Elbow Angle: ${elbowAngle.toInt()}°", style = MaterialTheme.typography.bodyLarge)
             Text(text = "Hip Angle: ${hipAngle.toInt()}°", style = MaterialTheme.typography.bodyLarge)
         }
 
-        // Draw Keypoints (Joints)
+        // ✅ Draw Keypoints (Joints)
         keyPoints.forEach { (x, y) ->
             Box(
                 modifier = Modifier
-                    .offset { androidx.compose.ui.unit.IntOffset(x.toInt(), y.toInt()) }
+                    .offset(x.dp, y.dp)
                     .size(10.dp)
                     .background(MaterialTheme.colorScheme.primary, CircleShape)
             )
         }
 
         DrawSkeletonLines(keyPoints, lineColor = MaterialTheme.colorScheme.secondary)
+
+
     }
 }
 
@@ -121,13 +125,14 @@ fun DrawSkeletonLines(keyPoints: List<Pair<Float, Float>>, lineColor: androidx.c
     }
 }
 
+
 @SuppressLint("UnsafeOptInUsageError")
 @Composable
 fun CameraPreview(
     context: Context,
     lifecycleOwner: LifecycleOwner,
     cameraExecutor: ExecutorService,
-    onDataUpdate: (Int, Double, Double, List<Pair<Float, Float>>) -> Unit
+    onDataUpdate: (Int, Double, Double, List<Pair<Float, Float>>) -> Unit  // ✅ Pass keypoints
 ) {
     AndroidView(
         modifier = Modifier.fillMaxSize(),
@@ -140,6 +145,8 @@ fun CameraPreview(
         }
     )
 }
+
+
 
 private fun startCamera(
     previewView: PreviewView,
@@ -164,37 +171,121 @@ private fun startCamera(
         }
 
         val cameraSelector = CameraSelector.Builder()
-            .requireLensFacing(CameraSelector.LENS_FACING_BACK)
+            .requireLensFacing(CameraSelector.LENS_FACING_BACK)  // ✅ Switch to front camera
             .build()
 
         cameraProvider.bindToLifecycle(lifecycleOwner, cameraSelector, preview, imageAnalyzer)
     }, context.mainExecutor)
 }
 
+
+
+private var pushUpCount = 0  // ✅ Persist push-up count across frames
+private var isGoingDown = false  // ✅ Track downward movement
+private var wasGoingDown = false  // ✅ Prevent multiple counts
+
 private fun processPushUpDetection(
     imageProxy: ImageProxy,
     context: Context,
-    onDataUpdate: (Int, Double, Double, List<Pair<Float, Float>>) -> Unit
+    onDataUpdate: (Int, Double, Double, List<Pair<Float, Float>>) -> Unit  // ✅ Send keypoints
 ) {
     val mediaImage = imageProxy.image
     if (mediaImage != null) {
         val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
-        val poseDetector = PoseDetection.getClient(AccuratePoseDetectorOptions.Builder().setDetectorMode(AccuratePoseDetectorOptions.STREAM_MODE).build())
+
+        //Create instance of PoseDetector
+        val options = AccuratePoseDetectorOptions.Builder()
+            .setDetectorMode(AccuratePoseDetectorOptions.STREAM_MODE)
+            .build()
+        val poseDetector = PoseDetection.getClient(options)
 
         poseDetector.process(image)
             .addOnSuccessListener { pose ->
                 val landmarks = pose.allPoseLandmarks
                 if (landmarks.isNotEmpty()) {
-                    val keyPoints = landmarks.map {
-                        Pair(it.position.x * imageProxy.width, it.position.y * imageProxy.height)
+                    val elbowAngle = getAngle(landmarks, PoseLandmark.LEFT_SHOULDER, PoseLandmark.LEFT_ELBOW, PoseLandmark.LEFT_WRIST)
+                    val hipAngle = getAngle(landmarks, PoseLandmark.LEFT_SHOULDER, PoseLandmark.LEFT_HIP, PoseLandmark.LEFT_KNEE)
+
+                    // ✅ Extract keypoint positions for skeleton overlay
+                    val keyPoints = listOf(
+                        PoseLandmark.LEFT_SHOULDER to PoseLandmark.LEFT_ELBOW,
+                        PoseLandmark.LEFT_ELBOW to PoseLandmark.LEFT_WRIST,
+                        PoseLandmark.LEFT_SHOULDER to PoseLandmark.LEFT_HIP,
+                        PoseLandmark.LEFT_HIP to PoseLandmark.LEFT_KNEE
+                    ).mapNotNull { (start, end) ->
+                        val startPoint = landmarks.find { it.landmarkType == start }?.position
+                        val endPoint = landmarks.find { it.landmarkType == end }?.position
+                        if (startPoint != null && endPoint != null) {
+                            listOf(Pair(startPoint.x, startPoint.y), Pair(endPoint.x, endPoint.y))
+                        } else {
+                            null
+                        }
+                    }.flatten()
+
+                    // ✅ Improved Push-Up Counting Logic
+                    if (elbowAngle < 90 && hipAngle > 160) {
+                        isGoingDown = true  // ✅ Detect downward motion
+                        wasGoingDown = true
                     }
 
-                    Log.d("PushupTracker", "Keypoints detected: $keyPoints")
-                    onDataUpdate(0, 0.0, 0.0, keyPoints)
+                    // ✅ Count Only When Going Back Up After Fully Going Down
+                    if (wasGoingDown && isGoingDown && elbowAngle > 160 && hipAngle > 160) {
+                        pushUpCount++  // ✅ Increment only after a full rep
+                        isGoingDown = false  // ✅ Reset for next push-up
+                        wasGoingDown = false  // ✅ Prevent multiple counts
+                        Log.d("PushupTracker", "Push-up Count Increased: $pushUpCount")  // ✅ Debugging Log
+                    }
+
+                    // ✅ Send push-up count, angles, and skeleton keypoints to UI
+                    onDataUpdate(pushUpCount, elbowAngle, hipAngle, keyPoints)
                 }
             }
             .addOnFailureListener { e ->
                 Log.e("PushupTracker", "Pose Detection Failed", e)
+            }
+            .addOnCompleteListener {
+                imageProxy.close()
+            }
+    }
+}
+
+
+
+
+
+
+//Get angle between 3 joints
+private fun getAngle(landmarks: List<PoseLandmark>, p1: Int, p2: Int, p3: Int): Double {
+    val point1 = landmarks[p1].position
+    val point2 = landmarks[p2].position
+    val point3 = landmarks[p3].position
+
+    val angle = Math.toDegrees(
+        atan2((point3.y - point2.y).toDouble(), (point3.x - point2.x).toDouble()) -
+                atan2((point1.y - point2.y).toDouble(), (point1.x - point2.x).toDouble())
+    )
+
+    return if (angle < 0) angle + 360 else angle
+}
+
+
+// Capture image from camera, converts it into InputImage format, then use ML kit's Pose Detection API to process frames,
+private fun processImageProxy(imageProxy: ImageProxy, context: Context) {
+    val mediaImage = imageProxy.image
+    if (mediaImage != null) {
+        val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
+        val options = PoseDetectorOptions.Builder()
+            .setDetectorMode(PoseDetectorOptions.STREAM_MODE)
+            .build()
+        val poseDetector = PoseDetection.getClient(options)
+
+        poseDetector.process(image)
+            .addOnSuccessListener { pose ->
+                // Implement push-up counting logic
+                Log.d("PushupScreen", "Pose Detected: ${pose.allPoseLandmarks}")
+            }
+            .addOnFailureListener { e ->
+                Log.e("PushupScreen", "Pose Detection Failed", e)
             }
             .addOnCompleteListener {
                 imageProxy.close()
