@@ -1,10 +1,13 @@
 package com.example.ippt.screens
 
 import android.annotation.SuppressLint
+import android.app.Activity
 import android.content.Context
+import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.util.Log
 import android.view.ViewGroup
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.*
@@ -20,6 +23,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -39,6 +43,8 @@ import kotlin.math.atan2
 @Composable
 fun PushupTrackerScreen(navController: NavController) {
     val context = LocalContext.current
+    val activity = context as? Activity
+
     val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
     var isCameraOn by remember { mutableStateOf(false) }
     var hasCameraPermission by remember { mutableStateOf(false) }
@@ -46,14 +52,12 @@ fun PushupTrackerScreen(navController: NavController) {
     var elbowAngle by remember { mutableStateOf(0.0) }
     var backAngle by remember { mutableStateOf(0.0) }
     var legAngle by remember { mutableStateOf(0.0) }
-
     var hipAngle by remember { mutableStateOf(0.0) }
     var keyPoints by remember { mutableStateOf(emptyList<Pair<Float, Float>>()) }
     var isUserReady by remember { mutableStateOf(false) }
     var isBackStraight by remember { mutableStateOf(true) }
 
-
-    // Request camera permission
+    // ✅ Request camera permission
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -64,7 +68,11 @@ fun PushupTrackerScreen(navController: NavController) {
     }
 
     LaunchedEffect(Unit) {
-        if (ContextCompat.checkSelfPermission(context, android.Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+        if (ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.CAMERA
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
             hasCameraPermission = true
             isCameraOn = true
         } else {
@@ -72,89 +80,121 @@ fun PushupTrackerScreen(navController: NavController) {
         }
     }
 
+
+
+    // ✅ Main UI
     Box(modifier = Modifier.fillMaxSize()) {
         if (hasCameraPermission) {
             if (isCameraOn) {
                 val lifecycleOwner = LocalLifecycleOwner.current
+
+                // ✅ Camera Preview
                 CameraPreview(context, lifecycleOwner, cameraExecutor) { newCount, newElbowAngle, newHipAngle, newKeyPoints, backStraight ->
                     if (isUserReady) {
                         pushUpCount = newCount
                         elbowAngle = newElbowAngle
                         hipAngle = newHipAngle
                         keyPoints = newKeyPoints
-                        isBackStraight = backStraight  // ✅ Track back straightness
-
+                        isBackStraight = backStraight
                     } else {
-                        // Detect if user is in a push-up position
+                        // ✅ Detect push-up position
                         if (newElbowAngle in 160.0..200.0 && newHipAngle in 160.0..200.0) {
                             isUserReady = true
                         }
                     }
                 }
+
+                // UI for before pushup position
+                if (!isUserReady) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.3f))
+                    ) {
+                        Text(
+                            text = "Align your body with the outline",
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = Color.White,
+                            modifier = Modifier
+                                .align(Alignment.TopCenter)
+                                .padding(top = 32.dp)
+                        )
+
+                        // ✅ Show Push-Up Outline overlay
+                        PushUpOutline(
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                        )
+
+                        // Additional Instructions
+                        Text(
+                            text = "Keep your back and knees straight.",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = Color.White,
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .padding(32.dp)
+                        )
+                    }
+                }
+
+                // ✅ UI for angles and skeleton visualization
+                if (isUserReady) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(150.dp)
+                            .background(MaterialTheme.colorScheme.background.copy(alpha = 0.8f))
+                            .align(Alignment.TopCenter)
+                            .padding(16.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            // ✅ Elbow and Hip Angles on the Left
+                            Column(
+                                horizontalAlignment = Alignment.Start
+                            ) {
+                                Text(text = "Elbow Angle: ${elbowAngle.toInt()}°", style = MaterialTheme.typography.bodySmall)
+                                Text(text = "Hip Angle: ${hipAngle.toInt()}°", style = MaterialTheme.typography.bodySmall)
+                                Text(text = "Back Angle: ${backAngle.toInt()}°", style = MaterialTheme.typography.bodySmall)
+                                Text(text = "Leg Angle: ${legAngle.toInt()}°", style = MaterialTheme.typography.bodySmall)
+                            }
+
+                            // ✅ Skeleton Visualization
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(300.dp)
+                                    .background(Color.LightGray.copy(alpha = 0.1f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                DrawSkeletonLines(
+                                    keyPoints = keyPoints,
+                                    backStraight = isBackStraight,
+                                    legStraight = legAngle in 160.0..200.0,
+                                    boxSize = 200f
+                                )
+                            }
+
+                            // ✅ Push-Up Count on the Right
+                            Text(
+                                text = "Push-ups: $pushUpCount",
+                                style = MaterialTheme.typography.headlineMedium,
+                                modifier = Modifier.align(Alignment.CenterVertically)
+                            )
+                        }
+                    }
+                }
             }
         } else {
+            // ✅ Show permission required message
             Text("Camera permission is required to use this feature.", modifier = Modifier.align(Alignment.Center))
         }
 
-        // ✅ Top Section Overlay
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(150.dp)
-                .background(MaterialTheme.colorScheme.background.copy(alpha = 0.8f)) // Semi-transparent background
-                .align(Alignment.TopCenter)
-                .padding(16.dp)
-        ) {
-            if (!isUserReady) {
-                // Show instruction
-                Text(
-                    text = "Please get into push-up position",
-                    style = MaterialTheme.typography.headlineMedium,
-                    modifier = Modifier.align(Alignment.Center)
-                )
-            } else {
-
-                // ✅ Display angles, skeleton visualization, and push-up count
-                Row(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    // Elbow and Hip Angles on the Left
-                    Column(
-                        horizontalAlignment = Alignment.Start
-                    ) {
-                        Text(text = "Elbow Angle: ${elbowAngle.toInt()}°", style = MaterialTheme.typography.bodyLarge)
-                        Text(text = "Hip Angle: ${hipAngle.toInt()}°", style = MaterialTheme.typography.bodyLarge)
-                    }
-
-                    // Skeleton Visualization in the Center
-                    Box(
-                        modifier = Modifier
-                            .size(100.dp)
-                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        DrawSkeletonLines(
-                            keyPoints = keyPoints,
-                            lineColor = MaterialTheme.colorScheme.secondary,
-                            boxSize = 80f  // Leave some padding inside the circle
-                        )
-                    }
-
-
-
-                    // Push-Up Count on the Right
-                    Text(
-                        text = "Push-ups: $pushUpCount",
-                        style = MaterialTheme.typography.headlineMedium,
-                        modifier = Modifier.align(Alignment.CenterVertically)
-                    )
-                }
-            }
-        }
-
-        // Display a warning message if the user's back isn't straight
+        // ✅ Warning if back isn't straight
         if (!isBackStraight) {
             Box(
                 modifier = Modifier
@@ -164,7 +204,7 @@ fun PushupTrackerScreen(navController: NavController) {
                     .padding(16.dp)
             ) {
                 Text(
-                    text = "Straighten back",
+                    text = "Straighten your back",
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onError,
                     modifier = Modifier.align(Alignment.Center)
@@ -174,11 +214,13 @@ fun PushupTrackerScreen(navController: NavController) {
     }
 }
 
+
 @Composable
 fun DrawSkeletonLines(
     keyPoints: List<Pair<Float, Float>>,
-    lineColor: androidx.compose.ui.graphics.Color,
-    boxSize: Float // Size of the square drawing area inside the circle
+    backStraight: Boolean,
+    legStraight: Boolean,
+    boxSize: Float // Controls the overall size of the skeleton
 ) {
     Canvas(modifier = Modifier.fillMaxSize()) {
         if (keyPoints.isEmpty()) return@Canvas
@@ -192,14 +234,15 @@ fun DrawSkeletonLines(
         val widthRange = maxX - minX
         val heightRange = maxY - minY
 
-        // Calculate scale factor to maintain aspect ratio
-        val scale = if (widthRange > heightRange) {
+        // Increase scale factor to enlarge the skeleton
+        val scaleMultiplier = 1.5f  // Increase this value for a bigger skeleton
+        val scale = scaleMultiplier * if (widthRange > heightRange) {
             boxSize / widthRange
         } else {
             boxSize / heightRange
         }
 
-        // Center offsets
+        // Center offsets to position the skeleton
         val centerX = size.width / 2
         val centerY = size.height / 2
 
@@ -210,17 +253,26 @@ fun DrawSkeletonLines(
             Pair(centerX + scaledX, centerY + scaledY)
         }
 
-        // Draw skeleton lines
-        normalizedKeyPoints.chunked(2).forEach { (start, end) ->
+        // Draw skeleton lines with conditional coloring
+        normalizedKeyPoints.chunked(2).forEachIndexed { index, (start, end) ->
+            val lineColor = when (index) {
+                2 -> if (!backStraight) Color.Red else Color.Gray  // 🔴 Red for back issues
+                3 -> if (!legStraight) Color.Red else Color.Gray   // 🔴 Red for leg issues
+                else -> Color.Gray  // ⚪ Default color for other joints
+            }
+
             drawLine(
                 color = lineColor,
                 start = Offset(start.first, start.second),
                 end = Offset(end.first, end.second),
-                strokeWidth = 3f
+                strokeWidth = 6f  // Thicker lines for better visibility
             )
         }
     }
 }
+
+
+
 
 
 
@@ -259,7 +311,8 @@ private fun startCamera(
     cameraProviderFuture.addListener({
         val cameraProvider = cameraProviderFuture.get()
 
-        val preview = Preview.Builder().build().also {
+        val preview = Preview.Builder().setTargetAspectRatio(AspectRatio.RATIO_16_9).  // ✅ Force landscape aspect ratio
+        build().also {
             it.setSurfaceProvider(previewView.surfaceProvider)
         }
 
@@ -305,7 +358,8 @@ private fun processPushUpDetection(
                 if (landmarks.isNotEmpty()) {
                     val elbowAngle = getAngle(landmarks, PoseLandmark.LEFT_SHOULDER, PoseLandmark.LEFT_ELBOW, PoseLandmark.LEFT_WRIST)
                     val hipAngle = getAngle(landmarks, PoseLandmark.LEFT_SHOULDER, PoseLandmark.LEFT_HIP, PoseLandmark.LEFT_KNEE)
-                    val backAngle = getAngle(landmarks, PoseLandmark.LEFT_SHOULDER,  // A
+                    val backAngle = getAngle(
+                        landmarks, PoseLandmark.LEFT_SHOULDER,  // A
                         PoseLandmark.LEFT_HIP,       // B (Vertex)
                         PoseLandmark.LEFT_KNEE       // C
                     )
@@ -317,13 +371,14 @@ private fun processPushUpDetection(
                         PoseLandmark.LEFT_ANKLE      // C
                     )
 
-                    // ✅ Extract keypoint positions for skeleton overlay
+                    // Extract keypoint positions for skeleton overlay
                     val keyPoints = listOf(
                         PoseLandmark.LEFT_SHOULDER to PoseLandmark.LEFT_ELBOW,
                         PoseLandmark.LEFT_ELBOW to PoseLandmark.LEFT_WRIST,
                         PoseLandmark.LEFT_SHOULDER to PoseLandmark.LEFT_HIP,
-                        PoseLandmark.LEFT_HIP to PoseLandmark.LEFT_KNEE
-                    ).mapNotNull { (start, end) ->
+                        PoseLandmark.LEFT_HIP to PoseLandmark.LEFT_KNEE,
+                        PoseLandmark.LEFT_KNEE to PoseLandmark.LEFT_ANKLE
+                        ).mapNotNull { (start, end) ->
                         val startPoint = landmarks.find { it.landmarkType == start }?.position
                         val endPoint = landmarks.find { it.landmarkType == end }?.position
                         if (startPoint != null && endPoint != null) {
@@ -333,7 +388,7 @@ private fun processPushUpDetection(
                         }
                     }.flatten()
 
-                    if (backAngle in 170.0..190.0 && legAngle in 170.0..190.0) {
+                    if (backAngle in 160.0..200.0 && legAngle in 160.0..200.0) {
                         backStraight = true
                     } else {
                         backStraight = false
@@ -383,6 +438,43 @@ private fun getAngle(landmarks: List<PoseLandmark>, p1: Int, p2: Int, p3: Int): 
 
     return if (angle < 0) angle + 360 else angle
 }
+
+
+@Composable
+fun PushUpOutline(modifier: Modifier = Modifier) {
+    Canvas(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(16.dp)  // Add padding for better spacing
+    ) {
+        val strokeWidth = 8f
+        val outlineColor = Color.White.copy(alpha = 0.7f)  // ✅ Higher visibility
+
+        // Draw the body outline (head to ankles as a straight line)
+        drawLine(
+            color = outlineColor,
+            start = Offset(size.width * 0.3f, size.height * 0.5f),  // Head position
+            end = Offset(size.width * 0.7f, size.height * 0.5f),  // Ankles position
+            strokeWidth = strokeWidth
+        )
+
+        // Draw arms
+        drawLine(
+            color = outlineColor,
+            start = Offset(size.width * 0.3f, size.height * 0.5f),  // Left shoulder
+            end = Offset(size.width * 0.3f, size.height * 0.65f),  // Left hand
+            strokeWidth = strokeWidth
+        )
+
+        drawLine(
+            color = outlineColor,
+            start = Offset(size.width * 0.7f, size.height * 0.5f),  // Right shoulder
+            end = Offset(size.width * 0.7f, size.height * 0.65f),  // Right hand
+            strokeWidth = strokeWidth
+        )
+    }
+}
+
 
 
 // Capture image from camera, converts it into InputImage format, then use ML kit's Pose Detection API to process frames,
