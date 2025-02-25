@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.example.ippt.screens.ARView
 import com.example.ippt.screens.HomeScreen
 import com.example.ippt.screens.PushupScreen
 import com.example.ippt.screens.PushupTrackerScreen
@@ -21,6 +22,7 @@ fun NavGraph() {
         composable("pushup") { PushupScreen(navController) }
         composable("run") { RunScreen(navController) }
         composable("pushup_tracker") { PushupTrackerScreen(navController) }
+        composable("AR") { ARView(navController) }
 
     }
 }
