@@ -28,6 +28,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.NavController
@@ -36,6 +38,8 @@ import com.google.mlkit.vision.pose.PoseDetection
 import com.google.mlkit.vision.pose.PoseLandmark
 import com.google.mlkit.vision.pose.accurate.AccuratePoseDetectorOptions
 import com.google.mlkit.vision.pose.defaults.PoseDetectorOptions
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlin.math.atan2
@@ -44,6 +48,25 @@ import kotlin.math.atan2
 fun PushupTrackerScreen(navController: NavController) {
     val context = LocalContext.current
     val activity = context as? Activity
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    // Set landscape orientation when the screen is started and reset when leaving
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+            } else if (event == Lifecycle.Event.ON_PAUSE) {
+                activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            }
+        }
+
+        lifecycleOwner.lifecycle.addObserver(observer)
+
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        }
+    }
 
     val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
     var isCameraOn by remember { mutableStateOf(false) }
@@ -56,6 +79,11 @@ fun PushupTrackerScreen(navController: NavController) {
     var keyPoints by remember { mutableStateOf(emptyList<Pair<Float, Float>>()) }
     var isUserReady by remember { mutableStateOf(false) }
     var isBackStraight by remember { mutableStateOf(true) }
+
+    // New state for countdown timer
+    var countdownTimer by remember { mutableStateOf(3) }
+    var isCountingDown by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
 
     // ✅ Request camera permission
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
@@ -80,6 +108,19 @@ fun PushupTrackerScreen(navController: NavController) {
         }
     }
 
+    // ✅ Function to start countdown
+    fun startCountdown() {
+        isCountingDown = true
+        coroutineScope.launch {
+            for (i in 5 downTo 1) {
+                countdownTimer = i
+                delay(1000L)  // 1-second delay
+            }
+            countdownTimer = 0
+            isCountingDown = false
+        }
+    }
+
 
 
     // ✅ Main UI
@@ -100,6 +141,7 @@ fun PushupTrackerScreen(navController: NavController) {
                         // ✅ Detect push-up position
                         if (newElbowAngle in 160.0..200.0 && newHipAngle in 160.0..200.0) {
                             isUserReady = true
+                            startCountdown()  // Start countdown once aligned
                         }
                     }
                 }
@@ -138,79 +180,124 @@ fun PushupTrackerScreen(navController: NavController) {
                     }
                 }
 
-                // ✅ UI for angles and skeleton visualization
-                if (isUserReady) {
+                // UI for before pushup position
+                if (isCountingDown) {
                     Box(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .height(150.dp)
-                            .background(MaterialTheme.colorScheme.background.copy(alpha = 0.8f))
-                            .align(Alignment.TopCenter)
-                            .padding(16.dp)
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.3f))
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxSize(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            // ✅ Elbow and Hip Angles on the Left
-                            Column(
-                                horizontalAlignment = Alignment.Start
-                            ) {
-                                Text(text = "Elbow Angle: ${elbowAngle.toInt()}°", style = MaterialTheme.typography.bodySmall)
-                                Text(text = "Hip Angle: ${hipAngle.toInt()}°", style = MaterialTheme.typography.bodySmall)
-                                Text(text = "Back Angle: ${backAngle.toInt()}°", style = MaterialTheme.typography.bodySmall)
-                                Text(text = "Leg Angle: ${legAngle.toInt()}°", style = MaterialTheme.typography.bodySmall)
-                            }
+                        Text(
+                            text = "Align your body with the outline",
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = Color.White,
+                            modifier = Modifier
+                                .align(Alignment.TopCenter)
+                                .padding(top = 32.dp)
+                        )
 
-                            // ✅ Skeleton Visualization
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(300.dp)
-                                    .background(Color.LightGray.copy(alpha = 0.1f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                DrawSkeletonLines(
-                                    keyPoints = keyPoints,
-                                    backStraight = isBackStraight,
-                                    legStraight = legAngle in 160.0..200.0,
-                                    boxSize = 200f
-                                )
-                            }
+                        // ✅ Show Push-Up Outline overlay
+                        PushUpOutline(
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                        )
 
-                            // ✅ Push-Up Count on the Right
-                            Text(
-                                text = "Push-ups: $pushUpCount",
-                                style = MaterialTheme.typography.headlineMedium,
-                                modifier = Modifier.align(Alignment.CenterVertically)
-                            )
-                        }
+                        // Additional Instructions
+                        Text(
+                            text = "Keep your back and knees straight.",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = Color.White,
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .padding(32.dp)
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.5f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "$countdownTimer",
+                            style = MaterialTheme.typography.displayLarge,
+                            color = Color.White
+                        )
                     }
                 }
+
+
+
+                // Start counting pushups after timer
+                if (isUserReady && countdownTimer == 0) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .weight(0.3f)
+                                .height(80.dp)
+                                .background(Color.Green.copy(alpha = 0.8f))
+                                //.align(Alignment.TopCenter)
+                                .padding(10.dp)
+                        ) {
+                            Text(
+                                text = "Push-ups: $pushUpCount",
+                                style = MaterialTheme.typography.bodyLarge,
+                            )
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .weight(0.7f)
+                                .height(80.dp)
+                                .background(MaterialTheme.colorScheme.background.copy(alpha = 0.8f))
+                                //.align(Alignment.TopCenter)
+                                .padding(10.dp)
+                        ) {
+                            DrawSkeletonLines(
+                                keyPoints = keyPoints,
+                                backStraight = isBackStraight,
+                                legStraight = legAngle in 160.0..200.0,
+                                boxSize = 200f
+                            )
+                        }
+
+
+                    }
+
+                    // ✅ Warning if back or legs aren't straight
+                    if (!isBackStraight) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.error.copy(alpha = 0.8f))
+                                .padding(16.dp)
+                        ) {
+                            Text(
+                                text = "Straighten Back",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onError,
+                                modifier = Modifier.align(Alignment.Center)
+                            )
+                        }
+
+                }
+
             }
+
+
         } else {
             // ✅ Show permission required message
             Text("Camera permission is required to use this feature.", modifier = Modifier.align(Alignment.Center))
         }
 
-        // ✅ Warning if back isn't straight
-        if (!isBackStraight) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.error.copy(alpha = 0.8f))
-                    .padding(16.dp)
-            ) {
-                Text(
-                    text = "Straighten your back",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onError,
-                    modifier = Modifier.align(Alignment.Center)
-                )
-            }
+
         }
+
     }
 }
 
@@ -257,7 +344,7 @@ fun DrawSkeletonLines(
         normalizedKeyPoints.chunked(2).forEachIndexed { index, (start, end) ->
             val lineColor = when (index) {
                 2 -> if (!backStraight) Color.Red else Color.Gray  // 🔴 Red for back issues
-                3 -> if (!legStraight) Color.Red else Color.Gray   // 🔴 Red for leg issues
+                3 -> if (!backStraight) Color.Red else Color.Gray   // 🔴 Red for leg issues
                 else -> Color.Gray  // ⚪ Default color for other joints
             }
 
@@ -448,32 +535,41 @@ fun PushUpOutline(modifier: Modifier = Modifier) {
             .padding(16.dp)  // Add padding for better spacing
     ) {
         val strokeWidth = 8f
-        val outlineColor = Color.White.copy(alpha = 0.7f)  // ✅ Higher visibility
+        val outlineColor = Color.White.copy(alpha = 0.7f)  // Higher visibility
 
-        // Draw the body outline (head to ankles as a straight line)
+        // Define body proportions
+        val headRadius = 150f
+        val bodyStart = Offset(size.width * 0.82f, size.height * 0.35f) // Shoulder
+        val bodyEnd = Offset(size.width * 0.10f, size.height * 0.6f) // Hip
+
+        // Draw Head (circle)
+        drawCircle(
+            color = outlineColor,
+            radius = headRadius,
+            center = Offset(size.width * 0.90f, size.height * 0.35f) // Head slightly above shoulders
+        )
+
+        // Draw Body (shoulders to hips)
         drawLine(
             color = outlineColor,
-            start = Offset(size.width * 0.3f, size.height * 0.5f),  // Head position
-            end = Offset(size.width * 0.7f, size.height * 0.5f),  // Ankles position
+            start = bodyStart,
+            end = bodyEnd,
             strokeWidth = strokeWidth
         )
 
-        // Draw arms
+        // Draw Arms (shoulders to ground)
+        val leftHand = Offset(size.width * 0.80f, size.height * 0.85f)
         drawLine(
             color = outlineColor,
-            start = Offset(size.width * 0.3f, size.height * 0.5f),  // Left shoulder
-            end = Offset(size.width * 0.3f, size.height * 0.65f),  // Left hand
+            start = bodyStart, // Shoulder position
+            end = leftHand,    // Hand on ground
             strokeWidth = strokeWidth
         )
 
-        drawLine(
-            color = outlineColor,
-            start = Offset(size.width * 0.7f, size.height * 0.5f),  // Right shoulder
-            end = Offset(size.width * 0.7f, size.height * 0.65f),  // Right hand
-            strokeWidth = strokeWidth
-        )
+
     }
 }
+
 
 
 
@@ -499,4 +595,8 @@ private fun processImageProxy(imageProxy: ImageProxy, context: Context) {
                 imageProxy.close()
             }
     }
+}
+
+fun setScreenOrientation(activity: Activity?, orientation: Int) {
+    activity?.requestedOrientation = orientation
 }
