@@ -73,7 +73,11 @@ dependencies {
 
     //location
     implementation ("com.google.android.gms:play-services-location:21.0.1")
-    implementation ("com.google.android.gms:play-services-maps:18.1.0")
-    implementation ("com.google.maps.android:maps-compose:2.14.0")
+
+    // SceneView AR module (correct module for AR support)
+    implementation("io.github.sceneview:sceneview:2.2.1")
+
+    // Google ARCore (required for AR functionality)
+    implementation("com.google.ar:core:1.47.0")
 
 }

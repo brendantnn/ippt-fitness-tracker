@@ -28,5 +28,11 @@ fun HomeScreen(navController: NavController) {
         Button(onClick = { navController.navigate("run") }) {
             Text("Go to Run Screen")
         }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Button(onClick = { navController.navigate("AR") }) {
+            Text("Go to AR Screen")
+        }
     }
 }
