@@ -71,8 +71,11 @@ dependencies {
     // Add ML Kit Pose Detection
     implementation ("com.google.mlkit:pose-detection-accurate:18.0.0-beta5")
 
+<<<<<<< HEAD
     //location
     implementation ("com.google.android.gms:play-services-location:21.0.1")
     implementation ("com.google.android.gms:play-services-maps:18.1.0")
     implementation ("com.google.maps.android:maps-compose:2.14.0")
+=======
+>>>>>>> Pushup-testing
 }

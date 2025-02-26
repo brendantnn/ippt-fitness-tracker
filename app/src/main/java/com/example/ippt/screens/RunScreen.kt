@@ -8,6 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+<<<<<<< HEAD
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
@@ -129,5 +130,17 @@ fun RunScreen(navController: NavController, viewModel: RunViewModel = viewModel(
                 Text("Finish")
             }
         }
+=======
+
+@Composable
+fun RunScreen(navController: NavController) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(16.dp),
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(text = "Run Screen", style = MaterialTheme.typography.headlineLarge)
+        Spacer(modifier = Modifier.height(16.dp))
+
+>>>>>>> Pushup-testing
     }
 }
