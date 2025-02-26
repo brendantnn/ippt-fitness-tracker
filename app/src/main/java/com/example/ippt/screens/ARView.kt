@@ -17,11 +17,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import androidx.core.content.FileProvider
-import java.io.File
-import java.io.FileOutputStream
-import java.io.IOException
-
 
 @Composable
 fun ARView(navController: NavController) {
@@ -33,67 +28,27 @@ fun ARView(navController: NavController) {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Button(onClick = {
-            val modelUri = copyModelToFiles(navController.context, "cube.glb")
-            if (modelUri != null) {
-                launchSceneViewer(navController.context, modelUri) // Pass modelUri directly
-            } else {
-                Toast.makeText(navController.context, "Model not found", Toast.LENGTH_SHORT).show()
-            }
+            launchSceneViewer(navController.context)
         }) {
             Text("View 3D Model in AR")
         }
     }
 }
 
-fun copyModelToFiles(context: Context, fileName: String): Uri? {
-    val filesDir = File(context.filesDir, fileName)
+fun launchSceneViewer(context: Context) {
+    val modelUrl = "https://drive.google.com/uc?export=download&id=1d_DG6_on4Remq22-BW0sqvy54ooV09Kj" // Replace with your actual file ID
 
-    if (filesDir.exists()) filesDir.delete() // Ensure a fresh copy
-    filesDir.parentFile?.mkdirs()
-
-    return try {
-        context.assets.open(fileName).use { inputStream ->
-            FileOutputStream(filesDir).use { outputStream ->
-                inputStream.copyTo(outputStream)
-            }
-        }
-        Log.d("ARView", "Model copied to files: ${filesDir.absolutePath}")
-
-        // Use FileProvider to create a content:// URI
-        val modelUri = FileProvider.getUriForFile(
-            context,
-            "${context.packageName}.provider", // Make sure this is in your AndroidManifest
-            filesDir
-        )
-        modelUri
-    } catch (e: IOException) {
-        Log.e("ARView", "Error copying model: ${e.message}", e)
-        null
-    }
-}
-
-fun launchSceneViewer(context: Context, modelUri: Uri?) {
-    if (modelUri == null) {
-        Log.e("ARView", "Model URI is null")
-        Toast.makeText(context, "3D Model not found", Toast.LENGTH_SHORT).show()
-        return
-    }
-
-    val encodedUri = Uri.encode(modelUri.toString())
     val intentUri = Uri.parse("https://arvr.google.com/scene-viewer/1.0")
         .buildUpon()
-        .appendQueryParameter("file", encodedUri)
+        .appendQueryParameter("file", modelUrl)
         .appendQueryParameter("mode", "ar_preferred")
         .build()
 
-
-    Log.d("ARView", "Encoded Scene Viewer URI: $encodedUri")
     Log.d("ARView", "Scene Viewer Intent URI: $intentUri")
 
     val sceneViewerIntent = Intent(Intent.ACTION_VIEW).apply {
         data = intentUri
         setPackage("com.google.android.googlequicksearchbox") // Scene Viewer package
-        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION) // Allow reading the file
     }
 
     try {
