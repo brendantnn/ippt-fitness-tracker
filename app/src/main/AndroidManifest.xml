@@ -25,13 +25,10 @@
             </intent-filter>
         </activity>
 
-<<<<<<< HEAD
         <meta-data
             android:name="com.google.android.geo.API_KEY"
             android:value="AIzaSyCTeQJ6Gdi36g2sGprTvUbzgBg7gF_ULn0"/>
-=======
 
->>>>>>> Pushup-testing
     </application>
     <uses-permission android:name="android.permission.CAMERA" />
 
