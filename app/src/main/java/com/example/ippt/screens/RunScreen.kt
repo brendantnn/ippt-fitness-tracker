@@ -96,7 +96,8 @@ fun RunScreen(navController: NavController, viewModel: RunViewModel = viewModel(
             Marker(
                 state = MarkerState(position = singapore),
                 title = "You"
-            )        }
+            )
+        }
 
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -130,17 +131,17 @@ fun RunScreen(navController: NavController, viewModel: RunViewModel = viewModel(
                 Text("Finish")
             }
         }
-=======
 
-@Composable
-fun RunScreen(navController: NavController) {
-    Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text(text = "Run Screen", style = MaterialTheme.typography.headlineLarge)
-        Spacer(modifier = Modifier.height(16.dp))
+        @Composable
+        fun RunScreen(navController: NavController) {
+            Column(
+                modifier = Modifier.fillMaxSize().padding(16.dp),
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(text = "Run Screen", style = MaterialTheme.typography.headlineLarge)
+                Spacer(modifier = Modifier.height(16.dp))
 
->>>>>>> Pushup-testing
+            }
+        }
     }
 }
