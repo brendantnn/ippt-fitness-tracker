@@ -24,24 +24,16 @@ import com.google.maps.android.compose.*
 @Composable
 fun RunSummaryScreen(navController: NavController, viewModel: RunViewModel) {
     val distance by viewModel.distance.collectAsState()
-    val pace by viewModel.pace.collectAsState()
     val timeElapsed by viewModel.timeElapsed.collectAsState()
     val elevationGain by viewModel.elevationGain.collectAsState()
     val pathPoints by viewModel.pathPoints.collectAsState()
     val steps by viewModel.steps.collectAsState()
 
-    //calculate the average pace dynamically
     val averagePace = viewModel.calculateAveragePace()
+    val lastLocation = pathPoints.lastOrNull() ?: LatLng(1.3521, 103.8198)
 
-    val lastLocation = if (pathPoints.isNotEmpty()) pathPoints.last() else LatLng(1.3521, 103.8198) // Default to Singapore if empty
     val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(lastLocation, 15f)
-    }
-
-    LaunchedEffect(pathPoints) {
-        if (pathPoints.isNotEmpty()) {
-            cameraPositionState.position = CameraPosition.fromLatLngZoom(pathPoints.last(), 15f)
-        }
     }
 
     Scaffold(
@@ -60,49 +52,17 @@ fun RunSummaryScreen(navController: NavController, viewModel: RunViewModel) {
             modifier = Modifier.fillMaxSize().padding(paddingValues).padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Map with Route
-            Box(
-                modifier = Modifier.fillMaxWidth().height(250.dp)
-            ) {
-                GoogleMap(
-                    modifier = Modifier.fillMaxSize(),
-                    cameraPositionState = cameraPositionState
-                ) {
-                    Polyline(points = pathPoints, color = Color.Red, width = 5f)
-                    if (pathPoints.isNotEmpty()) {
-                        Marker(
-                            state = MarkerState(position = pathPoints.last()),
-                            title = "End Location"
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Text("Running Summary", fontSize = 20.sp, fontWeight = FontWeight.Bold)
-
-            Spacer(modifier = Modifier.height(16.dp))
+            Text("Run Summary", fontSize = 20.sp)
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                 SummaryItem(title = "Distance", value = "${String.format("%.2f", distance)} km")
                 SummaryItem(title = "Avg Pace", value = if (averagePace > 0) "${String.format("%.2f", averagePace)} min/km" else "--")
                 SummaryItem(title = "Elevation", value = "${String.format("%.1f", elevationGain)} m")
                 SummaryItem(title = "Steps", value = "$steps")
-
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
             Button(
-                onClick = {
-                    viewModel.resetRunData()
-                    navController.navigate("home"){
-                        popUpTo("home") { inclusive = true } // Clears navigation stack
-                    }
-                },
+                onClick = { viewModel.resetRunData(); navController.navigate("home") },
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF5722))
             ) {

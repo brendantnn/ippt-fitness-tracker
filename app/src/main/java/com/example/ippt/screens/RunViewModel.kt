@@ -33,11 +33,9 @@ import android.content.pm.PackageManager
 import com.google.android.gms.maps.model.LatLng
 
 
-// Data class representing user's location state
 data class LocationState(val latitude: Double = 0.0, val longitude: Double = 0.0, val speed: Float = 0.0f)
 
 class RunViewModel(application: Application) : AndroidViewModel(application), SensorEventListener {
-    // State variables
     private val _locationState = MutableStateFlow(LocationState())
     val locationState: StateFlow<LocationState> = _locationState
 
@@ -46,9 +44,6 @@ class RunViewModel(application: Application) : AndroidViewModel(application), Se
 
     private val _distance = MutableStateFlow(0.0)
     val distance: StateFlow<Double> = _distance
-
-    private val _pace = MutableStateFlow(0.0)
-    val pace: StateFlow<Double> = _pace
 
     private val _timeElapsed = MutableStateFlow(0)
     val timeElapsed: StateFlow<Int> = _timeElapsed
@@ -59,18 +54,13 @@ class RunViewModel(application: Application) : AndroidViewModel(application), Se
     private val _elevationGain = MutableStateFlow(0.0)
     val elevationGain: StateFlow<Double> = _elevationGain
 
-    private var initialSteps = 0 // Stores the step count at the start of the run
-
-
-
-
-    // Google API to fetch real-time location updates
+    private var initialSteps = 0
     private val fusedLocationClient = LocationServices.getFusedLocationProviderClient(application)
     private var lastLocation: Location? = null
-    private var isTracking = false
+    //private var isTracking = false
 
-
-
+    private val _isTracking = MutableStateFlow(false) // Private mutable state
+    val isTracking: StateFlow<Boolean> = _isTracking // Publicly exposed immutable state
 
     private val locationRequest = LocationRequest.Builder(
         Priority.PRIORITY_HIGH_ACCURACY, 2000
@@ -79,7 +69,6 @@ class RunViewModel(application: Application) : AndroidViewModel(application), Se
         setGranularity(Granularity.GRANULARITY_PERMISSION_LEVEL)
     }.build()
 
-    // Updates user location and computes distance covered
     private val locationCallback = object : LocationCallback() {
         override fun onLocationResult(locationResult: LocationResult) {
             locationResult.locations.lastOrNull()?.let { location ->
@@ -92,19 +81,12 @@ class RunViewModel(application: Application) : AndroidViewModel(application), Se
                     speed = location.speed
                 )
 
-                if (prevLocation != null && isTracking) {
-                    val distanceIncrement = prevLocation.distanceTo(location) / 1000 // Convert to km
+                if (prevLocation != null && isTracking.value) {
+                    val distanceIncrement = prevLocation.distanceTo(location) / 1000
                     _distance.value += distanceIncrement
 
-                    // Calculate pace (min/km)
-                    if (_distance.value > 0) {
-                        _pace.value = (_timeElapsed.value / 60.0) / _distance.value
-                    }
-
-                    // Track the running route
                     _pathPoints.value = _pathPoints.value + LatLng(location.latitude, location.longitude)
 
-                    // Calculate elevation gain
                     val elevationDiff = location.altitude - prevLocation.altitude
                     if (elevationDiff > 0) {
                         _elevationGain.value += elevationDiff
@@ -114,34 +96,27 @@ class RunViewModel(application: Application) : AndroidViewModel(application), Se
         }
     }
 
-    // Step Sensor Setup
     private val sensorManager = application.getSystemService(Context.SENSOR_SERVICE) as SensorManager
     private val stepSensor = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
 
-    // Starts tracking time, distance, and route when user begins running
     fun startTracking() {
-        val applicationContext = getApplication<Application>().applicationContext
+        val context = getApplication<Application>().applicationContext
 
-        if (ActivityCompat.checkSelfPermission(applicationContext, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+        if (ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             return
         }
 
-        // Register Step Counter Sensor
-        stepSensor?.let {
-            sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_UI)
-        }
+        stepSensor?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_UI) }
 
-
-        // Get last known location before starting updates
         fusedLocationClient.lastLocation.addOnSuccessListener { location ->
             location?.let {
                 _locationState.value = LocationState(latitude = it.latitude, longitude = it.longitude, speed = it.speed)
             }
         }
 
-        isTracking = true
+        _isTracking.value = true
         viewModelScope.launch {
-            while (isTracking) {
+            while (_isTracking.value) {
                 delay(1000)
                 _timeElapsed.value += 1
             }
@@ -150,14 +125,12 @@ class RunViewModel(application: Application) : AndroidViewModel(application), Se
         fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, Looper.getMainLooper())
     }
 
-    // Pauses tracking without resetting data
     fun pauseTracking() {
-        isTracking = false
+        _isTracking.value = false
     }
 
-    // Stops tracking completely and clears location updates
     fun stopTracking() {
-        isTracking = false
+        _isTracking.value = false
         fusedLocationClient.removeLocationUpdates(locationCallback)
         sensorManager.unregisterListener(this)
     }
@@ -166,10 +139,10 @@ class RunViewModel(application: Application) : AndroidViewModel(application), Se
         event?.let {
             if (it.sensor.type == Sensor.TYPE_STEP_COUNTER) {
                 val currentSteps = it.values[0].toInt()
-                if (initialSteps == 0  && isTracking) {
-                    initialSteps = currentSteps // Capture the initial step count
+                if (initialSteps == 0 && _isTracking.value) {
+                    initialSteps = currentSteps
                 }
-                _steps.value = (currentSteps - initialSteps).coerceAtLeast(0) // Prevent negative values
+                _steps.value = (currentSteps - initialSteps).coerceAtLeast(0)
             }
         }
     }
@@ -178,18 +151,17 @@ class RunViewModel(application: Application) : AndroidViewModel(application), Se
 
     fun resetRunData() {
         _distance.value = 0.0
-        _pace.value = 0.0
         _steps.value = 0
         _timeElapsed.value = 0
-        _pathPoints.value = emptyList() // Clear route history
+        _pathPoints.value = emptyList()
         _elevationGain.value = 0.0
         lastLocation = null
-        initialSteps = 0 // Reset initial step count
+        initialSteps = 0
     }
 
     fun calculateAveragePace(): Double {
         return if (_distance.value > 0 && _timeElapsed.value > 0) {
-            (_timeElapsed.value / 60.0) / _distance.value // Minutes per km
+            (_timeElapsed.value / 60.0) / _distance.value
         } else {
             0.0
         }
