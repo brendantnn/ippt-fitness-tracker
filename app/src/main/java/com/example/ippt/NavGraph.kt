@@ -16,16 +16,15 @@ import com.example.ippt.screens.RunViewModel
 @Composable
 fun NavGraph() {
     val navController = rememberNavController()
+    val runViewModel: RunViewModel = viewModel() // Shared ViewModel
 
     NavHost(navController = navController, startDestination = "home") {
         composable("home") { HomeScreen(navController) }
         composable("pushup") { PushupScreen(navController) }
-        composable("run") { RunScreen(navController) }
         composable("pushup_tracker") { PushupTrackerScreen(navController) }
-        composable(route = "run_summary") {
-            val runViewModel: RunViewModel = viewModel()
-            RunSummaryScreen(navController, runViewModel)
-        }
-
+        composable("run") { RunScreen(navController, runViewModel) }
+        composable("run_summary") { RunSummaryScreen(navController, runViewModel) }
     }
+
+
 }

@@ -26,6 +26,23 @@ fun RunSummaryScreen(navController: NavController, viewModel: RunViewModel) {
     val distance by viewModel.distance.collectAsState()
     val pace by viewModel.pace.collectAsState()
     val timeElapsed by viewModel.timeElapsed.collectAsState()
+    val elevationGain by viewModel.elevationGain.collectAsState()
+    val pathPoints by viewModel.pathPoints.collectAsState()
+    val steps by viewModel.steps.collectAsState()
+
+    //calculate the average pace dynamically
+    val averagePace = viewModel.calculateAveragePace()
+
+    val lastLocation = if (pathPoints.isNotEmpty()) pathPoints.last() else LatLng(1.3521, 103.8198) // Default to Singapore if empty
+    val cameraPositionState = rememberCameraPositionState {
+        position = CameraPosition.fromLatLngZoom(lastLocation, 15f)
+    }
+
+    LaunchedEffect(pathPoints) {
+        if (pathPoints.isNotEmpty()) {
+            cameraPositionState.position = CameraPosition.fromLatLngZoom(pathPoints.last(), 15f)
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -40,50 +57,52 @@ fun RunSummaryScreen(navController: NavController, viewModel: RunViewModel) {
         }
     ) { paddingValues ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(16.dp),
+            modifier = Modifier.fillMaxSize().padding(paddingValues).padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Dummy Map Image (Replace with Google Maps if needed)
+            // Map with Route
             Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(200.dp)
+                modifier = Modifier.fillMaxWidth().height(250.dp)
             ) {
                 GoogleMap(
                     modifier = Modifier.fillMaxSize(),
-                    cameraPositionState = rememberCameraPositionState {
-                        position = CameraPosition.fromLatLngZoom(LatLng(1.3521, 103.8198), 12f) // Default to Singapore
+                    cameraPositionState = cameraPositionState
+                ) {
+                    Polyline(points = pathPoints, color = Color.Red, width = 5f)
+                    if (pathPoints.isNotEmpty()) {
+                        Marker(
+                            state = MarkerState(position = pathPoints.last()),
+                            title = "End Location"
+                        )
                     }
-                )
+                }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            Text("Morning Run", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Text("Running Summary", fontSize = 20.sp, fontWeight = FontWeight.Bold)
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                 SummaryItem(title = "Distance", value = "${String.format("%.2f", distance)} km")
-                SummaryItem(title = "Pace", value = "${String.format("%.2f", pace)} min/km")
-            }
+                SummaryItem(title = "Avg Pace", value = if (averagePace > 0) "${String.format("%.2f", averagePace)} min/km" else "--")
+                SummaryItem(title = "Elevation", value = "${String.format("%.1f", elevationGain)} m")
+                SummaryItem(title = "Steps", value = "$steps")
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                SummaryItem(title = "Moving Time", value = formatTime(timeElapsed))
-                SummaryItem(title = "Calories", value = "Est. ${String.format("%.0f", distance * 60)} cal") // Rough Estimate
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
             Button(
-                onClick = { navController.navigate("home") },
+                onClick = {
+                    viewModel.resetRunData()
+                    navController.navigate("home"){
+                        popUpTo("home") { inclusive = true } // Clears navigation stack
+                    }
+                },
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF5722))
             ) {
@@ -92,7 +111,6 @@ fun RunSummaryScreen(navController: NavController, viewModel: RunViewModel) {
         }
     }
 }
-
 @Composable
 fun SummaryItem(title: String, value: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
