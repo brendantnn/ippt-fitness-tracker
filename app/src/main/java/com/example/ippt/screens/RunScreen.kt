@@ -57,33 +57,39 @@ import com.google.maps.android.compose.*
 
 @Composable
 fun RunScreen(navController: NavController, viewModel: RunViewModel = viewModel()) {
+
+
     val locationState by viewModel.locationState.collectAsState()
     val steps by viewModel.steps.collectAsState()
     val distance by viewModel.distance.collectAsState()
+    val pace by viewModel.pace.collectAsState()
     val timeElapsed by viewModel.timeElapsed.collectAsState()
     val pathPoints by viewModel.pathPoints.collectAsState()
-    val isTracking by viewModel.isTracking.collectAsState()
 
     val cameraPositionState = rememberCameraPositionState()
+
+    var isTracking by remember { mutableStateOf(false) }
+
 
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions(),
         onResult = { grantedPermissions ->
             if (grantedPermissions[Manifest.permission.ACCESS_FINE_LOCATION] == true &&
                 grantedPermissions[Manifest.permission.ACTIVITY_RECOGNITION] == true) {
-                // Permissions granted, but tracking starts only when play button is clicked.
+                // Permissions granted, but do NOT start tracking yet.
             }
         }
     )
 
     LaunchedEffect(Unit) {
-        viewModel.resetRunData()
+        viewModel.resetRunData() // Clear previous run data when screen loads
         locationPermissionLauncher.launch(
             arrayOf(
                 Manifest.permission.ACCESS_FINE_LOCATION,
                 Manifest.permission.ACTIVITY_RECOGNITION
             )
         )
+
     }
 
     LaunchedEffect(locationState) {
@@ -106,14 +112,20 @@ fun RunScreen(navController: NavController, viewModel: RunViewModel = viewModel(
         )
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Google Map with Route Tracking
+        // Map View with Route Tracking
+        //val cameraPositionState = rememberCameraPositionState {
+        //    position = CameraPosition.fromLatLngZoom(
+        //      LatLng(locationState.latitude, locationState.longitude), 15f
+        //)
+        //}
         Card(
             modifier = Modifier.fillMaxWidth().height(300.dp),
             shape = RoundedCornerShape(12.dp),
             elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-        ) {
+        ){
+            //display google map with marker showing user location
             GoogleMap(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxWidth().height(300.dp),
                 cameraPositionState = cameraPositionState
             ) {
                 Marker(
@@ -125,8 +137,6 @@ fun RunScreen(navController: NavController, viewModel: RunViewModel = viewModel(
         }
 
         Spacer(modifier = Modifier.height(16.dp))
-
-        // Running Stats in Card
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
@@ -142,40 +152,42 @@ fun RunScreen(navController: NavController, viewModel: RunViewModel = viewModel(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    SummaryItem(title = "Distance", value = "${String.format("%.2f", distance)} km")
-                    SummaryItem(title = "Time", value = formatTime(timeElapsed))
-                    SummaryItem(title = "Steps", value = "$steps")
+                    // Running Stats
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                        SummaryItem(title = "Distance", value = "${String.format("%.2f", distance)} km")
+                        SummaryItem(title = "Time", value = formatTime(timeElapsed))
+                        SummaryItem(title = "Pace", value = if (pace > 0) "${String.format("%.2f", pace)} min/km" else "--")
+                        SummaryItem(title = "Steps", value = "$steps")
+
+                    }
                 }
             }
         }
+
 
         Spacer(modifier = Modifier.height(16.dp))
 
         // Control Buttons
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-            Button(
+            IconButton(
                 onClick = {
                     if (isTracking) {
                         viewModel.pauseTracking()
                     } else {
                         viewModel.startTracking()
                     }
+                    isTracking = !isTracking
                 },
                 modifier = Modifier.weight(1f).padding(8.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isTracking) Color.Yellow else Color.Green
-                ),
-                shape = RoundedCornerShape(12.dp)
+                colors = IconButtonDefaults.filledIconButtonColors(containerColor = Color.Green)
             ) {
                 Icon(
                     imageVector = if (isTracking) Icons.Default.Pause else Icons.Default.PlayArrow,
                     contentDescription = if (isTracking) "Pause" else "Start",
                     tint = Color.White
                 )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(text = if (isTracking) "Pause" else "Start", color = Color.White)
             }
-
+            //stop button
             Button(
                 onClick = {
                     viewModel.stopTracking()
@@ -186,8 +198,6 @@ fun RunScreen(navController: NavController, viewModel: RunViewModel = viewModel(
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Icon(imageVector = Icons.Default.Stop, contentDescription = "Finish", tint = Color.White)
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(text = "Finish", color = Color.White)
             }
         }
     }

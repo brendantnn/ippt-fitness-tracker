@@ -54,6 +54,33 @@ fun RunSummaryScreen(navController: NavController, viewModel: RunViewModel) {
         ) {
             Text("Run Summary", fontSize = 20.sp)
 
+            // ✅ **Add Google Map Here**
+            Card(
+                modifier = Modifier.fillMaxWidth().height(300.dp),
+                shape = RoundedCornerShape(12.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+            ) {
+                GoogleMap(
+                    modifier = Modifier.fillMaxSize(),
+                    cameraPositionState = cameraPositionState
+                ) {
+                    if (pathPoints.isNotEmpty()) {
+                        Marker(
+                            state = MarkerState(position = pathPoints.first()),
+                            title = "Start"
+                        )
+                        Marker(
+                            state = MarkerState(position = pathPoints.last()),
+                            title = "End"
+                        )
+                        Polyline(points = pathPoints, color = Color.Red, width = 5f)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                 SummaryItem(title = "Distance", value = "${String.format("%.2f", distance)} km")
                 SummaryItem(title = "Avg Pace", value = if (averagePace > 0) "${String.format("%.2f", averagePace)} min/km" else "--")
