@@ -1,5 +1,6 @@
 package com.example.ippt.screens
 
+import android.R.attr.text
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
@@ -7,7 +8,6 @@ import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.util.Log
 import android.view.ViewGroup
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.*
@@ -16,7 +16,8 @@ import androidx.camera.view.PreviewView
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -43,6 +44,7 @@ import kotlinx.coroutines.launch
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlin.math.atan2
+
 
 @Composable
 fun PushupTrackerScreen(navController: NavController) {
@@ -79,11 +81,19 @@ fun PushupTrackerScreen(navController: NavController) {
     var keyPoints by remember { mutableStateOf(emptyList<Pair<Float, Float>>()) }
     var isUserReady by remember { mutableStateOf(false) }
     var isBackStraight by remember { mutableStateOf(true) }
+    var firstPushUpDone by remember { mutableStateOf(false) }
 
-    // New state for countdown timer
+
+    // New state for 10s countdown timer
     var countdownTimer by remember { mutableStateOf(3) }
     var isCountingDown by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
+
+    // For 60 sec timer
+    var timeLeft by remember { mutableStateOf(60) }
+    var isTimerRunning by remember { mutableStateOf(false) }
+    var showSaveDialog by remember { mutableStateOf(false) }
+
 
     // ✅ Request camera permission
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
@@ -108,7 +118,7 @@ fun PushupTrackerScreen(navController: NavController) {
         }
     }
 
-    // ✅ Function to start countdown
+    //  Start 10 sec countdown
     fun startCountdown() {
         isCountingDown = true
         coroutineScope.launch {
@@ -121,6 +131,18 @@ fun PushupTrackerScreen(navController: NavController) {
         }
     }
 
+    // Start the 60-second timer only after the first push-up is detected
+    LaunchedEffect(firstPushUpDone) {
+        if (firstPushUpDone && !isTimerRunning) {
+            isTimerRunning = true
+            while (timeLeft > 0) {
+                delay(1000L)
+                timeLeft -= 1
+            }
+            isTimerRunning = false
+            showSaveDialog = true // Show save/discard options when time runs out
+        }
+    }
 
 
     // ✅ Main UI
@@ -129,38 +151,48 @@ fun PushupTrackerScreen(navController: NavController) {
             if (isCameraOn) {
                 val lifecycleOwner = LocalLifecycleOwner.current
 
-                // ✅ Camera Preview
+                // Camera Preview
                 CameraPreview(context, lifecycleOwner, cameraExecutor) { newCount, newElbowAngle, newHipAngle, newKeyPoints, backStraight ->
-                    if (isUserReady) {
-                        pushUpCount = newCount
-                        elbowAngle = newElbowAngle
-                        hipAngle = newHipAngle
-                        keyPoints = newKeyPoints
-                        isBackStraight = backStraight
-                    } else {
-                        // ✅ Detect push-up position
-                        if (newElbowAngle in 160.0..200.0 && newHipAngle in 160.0..200.0) {
-                            isUserReady = true
-                            startCountdown()  // Start countdown once aligned
-                        }
+
+                    pushUpCount = newCount
+                    elbowAngle = newElbowAngle
+                    hipAngle = newHipAngle
+                    keyPoints = newKeyPoints
+                    isBackStraight = backStraight
+
+                    // Start timer only after first push-up
+                    if (newCount > 0 && !firstPushUpDone) {
+                        firstPushUpDone = true
                     }
                 }
 
                 // UI for before pushup position
-                if (!isUserReady) {
+                if (!firstPushUpDone) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
                             .background(Color.Black.copy(alpha = 0.3f))
                     ) {
-                        Text(
-                            text = "Align your body with the outline",
-                            style = MaterialTheme.typography.headlineSmall,
-                            color = Color.White,
-                            modifier = Modifier
-                                .align(Alignment.TopCenter)
-                                .padding(top = 32.dp)
-                        )
+                        Column( modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(top = 10.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally)
+                        {
+                            Text(
+                                text = "Align your body with the outline",
+                                style = MaterialTheme.typography.headlineSmall,
+                                color = Color.White,
+                            )
+                            Text(
+                                text = "Do first pushup to start timer",
+                                style = MaterialTheme.typography.headlineSmall,
+                                color = Color.White,
+                            )
+
+
+
+                        }
+
 
                         // ✅ Show Push-Up Outline overlay
                         PushUpOutline(
@@ -170,7 +202,7 @@ fun PushupTrackerScreen(navController: NavController) {
 
                         // Additional Instructions
                         Text(
-                            text = "Keep your back and knees straight.",
+                            text = "Keep your back and knees straight",
                             style = MaterialTheme.typography.bodyLarge,
                             color = Color.White,
                             modifier = Modifier
@@ -230,7 +262,7 @@ fun PushupTrackerScreen(navController: NavController) {
 
 
                 // Start counting pushups after timer
-                if (isUserReady && countdownTimer == 0) {
+                if (firstPushUpDone) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -239,23 +271,37 @@ fun PushupTrackerScreen(navController: NavController) {
                             modifier = Modifier
                                 .weight(0.3f)
                                 .height(80.dp)
-                                .background(Color.Green.copy(alpha = 0.8f))
-                                //.align(Alignment.TopCenter)
-                                .padding(10.dp)
+                                .background(Color.DarkGray.copy(alpha = 0.8f))
+                                .padding(5.dp),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Text(
-                                text = "Push-ups: $pushUpCount",
-                                style = MaterialTheme.typography.bodyLarge,
-                            )
+                            Column(   modifier = Modifier.fillMaxSize(),
+                                verticalArrangement = Arrangement.Center,
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = "$pushUpCount",
+                                    style = MaterialTheme.typography.displayLarge,
+                                    color = Color(0xFF2196F3),
+                                    modifier = Modifier.weight(0.5f)
+                                )
+                                Text(
+                                    text = "PUSH UPS",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color(0xFF2196F3),
+                                    modifier = Modifier.weight(0.1f)
+                                )
+                            }
                         }
 
                         Box(
                             modifier = Modifier
                                 .weight(0.7f)
                                 .height(80.dp)
-                                .background(MaterialTheme.colorScheme.background.copy(alpha = 0.8f))
-                                //.align(Alignment.TopCenter)
+                                .background(Color.DarkGray.copy(alpha = 0.8f))
                                 .padding(10.dp)
+                            ,    contentAlignment = Alignment.Center
+
                         ) {
                             DrawSkeletonLines(
                                 keyPoints = keyPoints,
@@ -263,6 +309,36 @@ fun PushupTrackerScreen(navController: NavController) {
                                 legStraight = legAngle in 160.0..200.0,
                                 boxSize = 200f
                             )
+                        }
+                        Box(
+                            modifier = Modifier
+                                .weight(0.3f)
+                                .height(80.dp)
+                                .background(Color.DarkGray.copy(alpha = 0.8f))
+                                .padding(5.dp),
+                            contentAlignment = Alignment.Center
+
+                        ) {
+
+                            Column(   modifier = Modifier.fillMaxSize(),
+                                verticalArrangement = Arrangement.Center,
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ){
+                                Text(
+                                    text = "$timeLeft",
+                                    style = MaterialTheme.typography.displayLarge,
+                                    color = Color(0xFF2196F3),
+                                    modifier = Modifier.weight(0.5f)
+                                )
+                                Text(
+                                    text = "SECONDS LEFT",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color(0xFF2196F3),
+                                    modifier = Modifier.weight(0.1f)
+                                )
+
+                            }
+
                         }
 
 
@@ -276,6 +352,7 @@ fun PushupTrackerScreen(navController: NavController) {
                                 .fillMaxWidth()
                                 .background(MaterialTheme.colorScheme.error.copy(alpha = 0.8f))
                                 .padding(16.dp)
+
                         ) {
                             Text(
                                 text = "Straighten Back",
@@ -298,6 +375,35 @@ fun PushupTrackerScreen(navController: NavController) {
 
         }
 
+
+
+    }
+
+    // Save/Discard Dialog
+    if (showSaveDialog) {
+        AlertDialog(
+            onDismissRequest = { showSaveDialog = false },
+            title = { Text("Session Over") },
+            text = { Text("You completed $pushUpCount push-ups. Do you want to save the session?") },
+            confirmButton = {
+                Button(onClick = {
+                    // TODO: Implement Save Logic (e.g., store push-up count in a database)
+                    showSaveDialog = false
+                    navController.popBackStack()  // Navigate back after saving
+                }) {
+                    Text("Save")
+                }
+            },
+            dismissButton = {
+                Button(onClick = {
+                    pushUpCount = 0  // Reset push-up count
+                    showSaveDialog = false
+                    navController.popBackStack()  // Navigate back
+                }) {
+                    Text("Discard")
+                }
+            }
+        )
     }
 }
 
@@ -343,9 +449,9 @@ fun DrawSkeletonLines(
         // Draw skeleton lines with conditional coloring
         normalizedKeyPoints.chunked(2).forEachIndexed { index, (start, end) ->
             val lineColor = when (index) {
-                2 -> if (!backStraight) Color.Red else Color.Gray  // 🔴 Red for back issues
-                3 -> if (!backStraight) Color.Red else Color.Gray   // 🔴 Red for leg issues
-                else -> Color.Gray  // ⚪ Default color for other joints
+                2 -> if (!backStraight) Color.Red else Color(0xFF2196F3)
+                3 -> if (!backStraight) Color.Red else Color(0xFF2196F3)
+                else -> Color(0xFF2196F3)  // ⚪ Default color for other joints
             }
 
             drawLine(
