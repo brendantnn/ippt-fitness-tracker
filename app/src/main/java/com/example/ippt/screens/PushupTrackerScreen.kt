@@ -86,7 +86,7 @@ fun PushupTrackerScreen(navController: NavController) {
 
     // New state for 10s countdown timer
     var countdownTimer by remember { mutableStateOf(3) }
-    var isCountingDown by remember { mutableStateOf(false) }
+    var isCountingDown by remember { mutableStateOf(true) }
     val coroutineScope = rememberCoroutineScope()
 
     // For 60 sec timer
@@ -116,6 +116,16 @@ fun PushupTrackerScreen(navController: NavController) {
         } else {
             cameraPermissionLauncher.launch(android.Manifest.permission.CAMERA)
         }
+
+        // Start the 10-second countdown
+        isCountingDown = true
+        for (i in 10 downTo 1) {
+            countdownTimer = i
+            delay(1000L)
+        }
+        countdownTimer = 0
+        isCountingDown = false
+
     }
 
     //  Start 10 sec countdown
@@ -128,13 +138,18 @@ fun PushupTrackerScreen(navController: NavController) {
             }
             countdownTimer = 0
             isCountingDown = false
+            pushUpCount = 0
         }
+
     }
 
-    // Start the 60-second timer only after the first push-up is detected
-    LaunchedEffect(firstPushUpDone) {
-        if (firstPushUpDone && !isTimerRunning) {
+
+
+
+    LaunchedEffect(isCountingDown) {
+        if (!isCountingDown) {  // ✅ Start the 60-second timer only when countdown ends
             isTimerRunning = true
+            timeLeft = 60  // ✅ Reset timer when it starts
             while (timeLeft > 0) {
                 delay(1000L)
                 timeLeft -= 1
@@ -145,14 +160,15 @@ fun PushupTrackerScreen(navController: NavController) {
     }
 
 
+
     // ✅ Main UI
     Box(modifier = Modifier.fillMaxSize()) {
         if (hasCameraPermission) {
-            if (isCameraOn) {
+
                 val lifecycleOwner = LocalLifecycleOwner.current
 
                 // Camera Preview
-                CameraPreview(context, lifecycleOwner, cameraExecutor) { newCount, newElbowAngle, newHipAngle, newKeyPoints, backStraight ->
+                CameraPreview(context, lifecycleOwner, isCountingDown, cameraExecutor) { newCount, newElbowAngle, newHipAngle, newKeyPoints, backStraight ->
 
                     pushUpCount = newCount
                     elbowAngle = newElbowAngle
@@ -160,59 +176,10 @@ fun PushupTrackerScreen(navController: NavController) {
                     keyPoints = newKeyPoints
                     isBackStraight = backStraight
 
-                    // Start timer only after first push-up
-                    if (newCount > 0 && !firstPushUpDone) {
-                        firstPushUpDone = true
-                    }
                 }
 
-                // UI for before pushup position
-                if (!firstPushUpDone) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.3f))
-                    ) {
-                        Column( modifier = Modifier
-                            .align(Alignment.TopCenter)
-                            .padding(top = 10.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally)
-                        {
-                            Text(
-                                text = "Align your body with the outline",
-                                style = MaterialTheme.typography.headlineSmall,
-                                color = Color.White,
-                            )
-                            Text(
-                                text = "Do first pushup to start timer",
-                                style = MaterialTheme.typography.headlineSmall,
-                                color = Color.White,
-                            )
 
-
-
-                        }
-
-
-                        // ✅ Show Push-Up Outline overlay
-                        PushUpOutline(
-                            modifier = Modifier
-                                .align(Alignment.Center)
-                        )
-
-                        // Additional Instructions
-                        Text(
-                            text = "Keep your back and knees straight",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = Color.White,
-                            modifier = Modifier
-                                .align(Alignment.BottomCenter)
-                                .padding(32.dp)
-                        )
-                    }
-                }
-
-                // UI for before pushup position
+                // UI during 10sec timer
                 if (isCountingDown) {
                     Box(
                         modifier = Modifier
@@ -260,9 +227,8 @@ fun PushupTrackerScreen(navController: NavController) {
                 }
 
 
-
-                // Start counting pushups after timer
-                if (firstPushUpDone) {
+                // UI after 10 second timer
+                if (!isCountingDown) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -344,7 +310,7 @@ fun PushupTrackerScreen(navController: NavController) {
 
                     }
 
-                    // ✅ Warning if back or legs aren't straight
+                    // Warning if back or legs aren't straight
                     if (!isBackStraight) {
                         Box(
                             modifier = Modifier
@@ -366,18 +332,13 @@ fun PushupTrackerScreen(navController: NavController) {
 
             }
 
-
         } else {
             // ✅ Show permission required message
             Text("Camera permission is required to use this feature.", modifier = Modifier.align(Alignment.Center))
         }
 
-
         }
 
-
-
-    }
 
     // Save/Discard Dialog
     if (showSaveDialog) {
@@ -475,20 +436,23 @@ fun DrawSkeletonLines(
 fun CameraPreview(
     context: Context,
     lifecycleOwner: LifecycleOwner,
+    isCountingDown: Boolean,
     cameraExecutor: ExecutorService,
-    onDataUpdate: (Int, Double, Double, List<Pair<Float, Float>>, Boolean) -> Unit  // ✅ Pass keypoints
+    onDataUpdate: (Int, Double, Double, List<Pair<Float, Float>>, Boolean) -> Unit
 ) {
+    val previewView = remember { PreviewView(context) }
+
+    LaunchedEffect(Unit) {
+        startCamera(previewView, context, lifecycleOwner, cameraExecutor, isCountingDown, onDataUpdate)
+    }
+
+
     AndroidView(
         modifier = Modifier.fillMaxSize(),
-        factory = { ctx ->
-            val previewView = PreviewView(ctx).apply {
-                layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
-            }
-            startCamera(previewView, context, lifecycleOwner, cameraExecutor, onDataUpdate)
-            previewView
-        }
+        factory = { previewView }
     )
 }
+
 
 
 
@@ -497,6 +461,7 @@ private fun startCamera(
     context: Context,
     lifecycleOwner: LifecycleOwner,
     cameraExecutor: ExecutorService,
+    isCountingDown: Boolean,
     onDataUpdate: (Int, Double, Double, List<Pair<Float, Float>>, Boolean) -> Unit
 ) {
     val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
@@ -504,23 +469,40 @@ private fun startCamera(
     cameraProviderFuture.addListener({
         val cameraProvider = cameraProviderFuture.get()
 
-        val preview = Preview.Builder().setTargetAspectRatio(AspectRatio.RATIO_16_9).  // ✅ Force landscape aspect ratio
-        build().also {
-            it.setSurfaceProvider(previewView.surfaceProvider)
+        try {
+            // 🔴 Unbind all use cases before binding again
+            cameraProvider.unbindAll()
+
+            val preview = Preview.Builder()
+                .setTargetAspectRatio(AspectRatio.RATIO_16_9)
+                .build().also {
+                    it.setSurfaceProvider(previewView.surfaceProvider)
+                }
+
+            val imageAnalyzer = ImageAnalysis.Builder()
+                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                .build().also {
+                    it.setAnalyzer(cameraExecutor) { imageProxy ->
+                        processPushUpDetection(imageProxy, context) { newCount, newElbowAngle, newHipAngle, newKeyPoints, backStraight ->
+                            // ✅ Always update state, but only count push-ups after countdown ends
+                            onDataUpdate(newCount, newElbowAngle, newHipAngle, newKeyPoints, backStraight)
+                        }
+                    }
+                }
+
+
+            val cameraSelector = CameraSelector.Builder()
+                .requireLensFacing(CameraSelector.LENS_FACING_BACK)
+                .build()
+
+            // ✅ Bind the new use cases safely
+            cameraProvider.bindToLifecycle(lifecycleOwner, cameraSelector, preview, imageAnalyzer)
+
+        } catch (e: Exception) {
+            Log.e("CameraDebug", "Failed to start camera: ${e.message}")
         }
 
-        val imageAnalyzer = ImageAnalysis.Builder().setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST).build().also {
-            it.setAnalyzer(cameraExecutor) { imageProxy ->
-                processPushUpDetection(imageProxy, context, onDataUpdate)
-            }
-        }
-
-        val cameraSelector = CameraSelector.Builder()
-            .requireLensFacing(CameraSelector.LENS_FACING_BACK)
-            .build()
-
-        cameraProvider.bindToLifecycle(lifecycleOwner, cameraSelector, preview, imageAnalyzer)
-    }, context.mainExecutor)
+    }, ContextCompat.getMainExecutor(context))
 }
 
 
@@ -581,20 +563,21 @@ private fun processPushUpDetection(
                         }
                     }.flatten()
 
-                    if (backAngle in 160.0..200.0 && legAngle in 160.0..200.0) {
+                    // Check for back straightness
+                    if (backAngle in 140.0..200.0 && legAngle in 160.0..200.0) {
                         backStraight = true
                     } else {
                         backStraight = false
                     }
 
-                    // ✅ Improved Push-Up Counting Logic
-                    if (elbowAngle < 90 && hipAngle > 160) {
-                        isGoingDown = true  // ✅ Detect downward motion
+                    // Check for downward pushup motion
+                    if (elbowAngle < 100 && hipAngle > 140) {
+                        isGoingDown = true
                         wasGoingDown = true
                     }
 
                     // ✅ Count Only When Going Back Up After Fully Going Down
-                    if (wasGoingDown && isGoingDown && elbowAngle > 160 && hipAngle > 160 && backStraight) {
+                    if (wasGoingDown && isGoingDown && elbowAngle > 145 && hipAngle > 140 && backStraight) {
                         pushUpCount++  // ✅ Increment only after a full rep
                         isGoingDown = false  // ✅ Reset for next push-up
                         wasGoingDown = false  // ✅ Prevent multiple counts
