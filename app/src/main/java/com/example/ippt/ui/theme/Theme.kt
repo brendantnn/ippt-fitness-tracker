@@ -1,54 +1,56 @@
 package com.example.ippt.ui.theme
 
-import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
-import androidx.compose.material3.lightColorScheme
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
-private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80
+//Refined Orange/Yellow Sports Theme
+val OrangePrimary = Color(0xFFFF9800) // Vibrant Orange
+val GoldenYellow = Color(0xFFFFC107) // Accent Yellow
+val DeepOrange = Color(0xFFF57C00) // Darker Orange
+val DarkText = Color(0xFF5D4037) // Dark Brown text
+val LightBackground = Color(0xFFFFF8E1) //Softer Off-White Background
+val WhiteText = Color.White
+
+//Dark Mode Adjustments
+val DarkBackground = Color(0xFF212121) // Dark Gray
+val DarkSurface = Color(0xFF424242) // Slightly lighter gray
+
+// Light Mode Theme
+private val LightColorScheme = lightColorScheme(
+    primary = OrangePrimary,
+    secondary = GoldenYellow,
+    background = Color.White,
+    surface = Color.White,
+    onPrimary = WhiteText,
+    onSecondary = WhiteText,
+    onBackground = DarkText,
+    onSurface = DarkText
 )
 
-private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40
 
-    /* Other default colors to override
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
-    onPrimary = Color.White,
-    onSecondary = Color.White,
-    onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-    */
+//Dark Mode Theme
+private val DarkColorScheme = darkColorScheme(
+    primary = DeepOrange,
+    secondary = OrangePrimary,
+    background = DarkBackground,
+    surface = DarkSurface,
+    onPrimary = WhiteText,
+    onSecondary = WhiteText,
+    onBackground = Color.White,
+    onSurface = Color.White
 )
 
 @Composable
 fun IPPTTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
+    dynamicColor: Boolean = false, //Disable dynamic colors
     content: @Composable () -> Unit
 ) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
-    }
+    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
 
     MaterialTheme(
         colorScheme = colorScheme,

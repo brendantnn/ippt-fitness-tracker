@@ -1,38 +1,154 @@
 package com.example.ippt.screens
 
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DirectionsRun
+import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
+import com.example.ippt.R
 
 
 @Composable
 fun HomeScreen(navController: NavController) {
     Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
-        verticalArrangement = Arrangement.Center
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.White)
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(text = "Home Screen", style = MaterialTheme.typography.headlineLarge)
-        Spacer(modifier = Modifier.height(16.dp))
+        // Greeting Text
+        Text(
+            text = "Welcome to IPPT Fitness Tracker!",
+            style = MaterialTheme.typography.headlineLarge,
+            color = MaterialTheme.colorScheme.primary
+        )
 
-        Button(onClick = { navController.navigate("pushup") }) {
-            Text("Go to Pushup Screen")
-        }
+        Spacer(modifier = Modifier.height(32.dp))
 
-        Spacer(modifier = Modifier.height(8.dp))
+        // Push-Up Button
+        GradientButton(
+            imageRes = R.drawable.ic_push_up,
+            text = "Push-Up Tracker",
+            onClick = { navController.navigate("pushup") }
+        )
 
-        Button(onClick = { navController.navigate("run") }) {
-            Text("Go to Run Screen")
-        }
+        Spacer(modifier = Modifier.height(20.dp))
 
-        Spacer(modifier = Modifier.height(8.dp))
+        // Run Button
+        GradientButton(
+            imageRes = R.drawable.ic_run,
+            text = "Run Tracker",
+            onClick = { navController.navigate("run") }
+        )
+    }
+}
 
-        Button(onClick = { navController.navigate("AR") }) {
-            Text("Go to AR Screen")
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TopNavBar() {
+    CenterAlignedTopAppBar(
+        title = { Text("IPPT Fitness App") },
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = MaterialTheme.colorScheme.primary,
+            titleContentColor = MaterialTheme.colorScheme.onPrimary
+        )
+    )
+}
+
+//Gradient Button Design
+@Composable
+fun GradientButton(imageRes: Int, text: String, onClick: () -> Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(160.dp)
+            .shadow(6.dp, shape = RoundedCornerShape(12.dp)) //shadow for depth
+            .clickable { onClick() },
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Image(
+                painter = painterResource(id = imageRes),
+                contentDescription = text,
+                modifier = Modifier.fillMaxSize()
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Black.copy(alpha = 0.15f),
+                                Color.Black.copy(alpha = 0.4f)
+                            )
+                        )
+                    )
+            )
+            Text(
+                text = text,
+                color = Color.White,
+                fontSize = 22.sp,
+                modifier = Modifier.align(Alignment.Center)
+            )
         }
     }
+}
+
+//  Bottom Navigation Bar
+@Composable
+fun BottomNavBar(navController: NavController) {
+    val items = listOf(
+        NavItem("Home", "home", Icons.Filled.Home),
+        NavItem("Pushups", "pushup", Icons.Filled.FitnessCenter),
+        NavItem("Run", "run", Icons.Filled.DirectionsRun)
+    )
+
+    NavigationBar(containerColor = MaterialTheme.colorScheme.primary) {
+        val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
+
+        items.forEach { item ->
+            NavigationBarItem(
+                icon = { Icon(item.icon, contentDescription = item.title) },
+                label = { Text(item.title) },
+                selected = currentRoute == item.route,
+                onClick = { navController.navigate(item.route) },
+                colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = MaterialTheme.colorScheme.onPrimary,
+                    unselectedIconColor = MaterialTheme.colorScheme.onSurface,
+                    selectedTextColor = MaterialTheme.colorScheme.onPrimary,
+                    unselectedTextColor = MaterialTheme.colorScheme.onSurface
+                )
+            )
+        }
+    }
+}
+
+
+data class NavItem(val title: String, val route: String, val icon: androidx.compose.ui.graphics.vector.ImageVector)
+
+@Preview(showBackground = true)
+@Composable
+fun HomeScreenPreview() {
+    HomeScreen(navController = rememberNavController())
 }
