@@ -95,7 +95,7 @@ fun PushupTrackerScreen(navController: NavController) {
     var showSaveDialog by remember { mutableStateOf(false) }
 
 
-    // ✅ Request camera permission
+    // Request camera permission
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -105,7 +105,9 @@ fun PushupTrackerScreen(navController: NavController) {
         }
     }
 
+    // Run once when enter recomposition and never reexecutes
     LaunchedEffect(Unit) {
+        // Check if camera permission is granted
         if (ContextCompat.checkSelfPermission(
                 context,
                 android.Manifest.permission.CAMERA
@@ -116,7 +118,6 @@ fun PushupTrackerScreen(navController: NavController) {
         } else {
             cameraPermissionLauncher.launch(android.Manifest.permission.CAMERA)
         }
-
         // Start the 10-second countdown
         isCountingDown = true
         for (i in 10 downTo 1) {
@@ -125,31 +126,13 @@ fun PushupTrackerScreen(navController: NavController) {
         }
         countdownTimer = 0
         isCountingDown = false
-
     }
 
-    //  Start 10 sec countdown
-    fun startCountdown() {
-        isCountingDown = true
-        coroutineScope.launch {
-            for (i in 5 downTo 1) {
-                countdownTimer = i
-                delay(1000L)  // 1-second delay
-            }
-            countdownTimer = 0
-            isCountingDown = false
-            pushUpCount = 0
-        }
-
-    }
-
-
-
-
+    // Start 60 second timer when 10 second timer ends
     LaunchedEffect(isCountingDown) {
-        if (!isCountingDown) {  // ✅ Start the 60-second timer only when countdown ends
+        if (!isCountingDown) {
             isTimerRunning = true
-            timeLeft = 60  // ✅ Reset timer when it starts
+            timeLeft = 60  // Reset timer when it starts
             while (timeLeft > 0) {
                 delay(1000L)
                 timeLeft -= 1
@@ -159,25 +142,18 @@ fun PushupTrackerScreen(navController: NavController) {
         }
     }
 
-
-
-    // ✅ Main UI
+    // Main UI
     Box(modifier = Modifier.fillMaxSize()) {
+        // Start camera preview if permission is granted
         if (hasCameraPermission) {
-
                 val lifecycleOwner = LocalLifecycleOwner.current
-
-                // Camera Preview
-                CameraPreview(context, lifecycleOwner, isCountingDown, cameraExecutor) { newCount, newElbowAngle, newHipAngle, newKeyPoints, backStraight ->
-
+                CameraPreview(context, lifecycleOwner, { isCountingDown }, cameraExecutor) { newCount, newElbowAngle, newHipAngle, newKeyPoints, backStraight ->
                     pushUpCount = newCount
                     elbowAngle = newElbowAngle
                     hipAngle = newHipAngle
                     keyPoints = newKeyPoints
                     isBackStraight = backStraight
-
                 }
-
 
                 // UI during 10sec timer
                 if (isCountingDown) {
@@ -195,7 +171,7 @@ fun PushupTrackerScreen(navController: NavController) {
                                 .padding(top = 32.dp)
                         )
 
-                        // ✅ Show Push-Up Outline overlay
+                        // Show Push-Up Outline overlay
                         PushUpOutline(
                             modifier = Modifier
                                 .align(Alignment.Center)
@@ -332,15 +308,16 @@ fun PushupTrackerScreen(navController: NavController) {
 
             }
 
-        } else {
-            // ✅ Show permission required message
+        }
+        // Show permission required message
+        else {
+
             Text("Camera permission is required to use this feature.", modifier = Modifier.align(Alignment.Center))
         }
-
         }
 
 
-    // Save/Discard Dialog
+    // Show save/discard dialog
     if (showSaveDialog) {
         AlertDialog(
             onDismissRequest = { showSaveDialog = false },
@@ -425,27 +402,22 @@ fun DrawSkeletonLines(
     }
 }
 
-
-
-
-
-
-
 @SuppressLint("UnsafeOptInUsageError")
 @Composable
 fun CameraPreview(
     context: Context,
     lifecycleOwner: LifecycleOwner,
-    isCountingDown: Boolean,
+    isCountingDown: () -> Boolean,
     cameraExecutor: ExecutorService,
     onDataUpdate: (Int, Double, Double, List<Pair<Float, Float>>, Boolean) -> Unit
 ) {
     val previewView = remember { PreviewView(context) }
 
+
+    // Runs startCamera once
     LaunchedEffect(Unit) {
         startCamera(previewView, context, lifecycleOwner, cameraExecutor, isCountingDown, onDataUpdate)
     }
-
 
     AndroidView(
         modifier = Modifier.fillMaxSize(),
@@ -453,15 +425,12 @@ fun CameraPreview(
     )
 }
 
-
-
-
 private fun startCamera(
     previewView: PreviewView,
     context: Context,
     lifecycleOwner: LifecycleOwner,
     cameraExecutor: ExecutorService,
-    isCountingDown: Boolean,
+    isCountingDown: () -> Boolean,
     onDataUpdate: (Int, Double, Double, List<Pair<Float, Float>>, Boolean) -> Unit
 ) {
     val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
@@ -470,7 +439,7 @@ private fun startCamera(
         val cameraProvider = cameraProviderFuture.get()
 
         try {
-            // 🔴 Unbind all use cases before binding again
+            // Unbind all use cases before binding again
             cameraProvider.unbindAll()
 
             val preview = Preview.Builder()
@@ -483,8 +452,8 @@ private fun startCamera(
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .build().also {
                     it.setAnalyzer(cameraExecutor) { imageProxy ->
-                        processPushUpDetection(imageProxy, context) { newCount, newElbowAngle, newHipAngle, newKeyPoints, backStraight ->
-                            // ✅ Always update state, but only count push-ups after countdown ends
+                        processPushUpDetection(imageProxy, context, isCountingDown) { newCount, newElbowAngle, newHipAngle, newKeyPoints, backStraight ->
+                            // Always update state, but only count push-ups after countdown ends
                             onDataUpdate(newCount, newElbowAngle, newHipAngle, newKeyPoints, backStraight)
                         }
                     }
@@ -515,6 +484,7 @@ private var backStraight = false
 private fun processPushUpDetection(
     imageProxy: ImageProxy,
     context: Context,
+    isCountingDown: () -> Boolean,
     onDataUpdate: (Int, Double, Double, List<Pair<Float, Float>>, Boolean) -> Unit  // ✅ Send keypoints
 ) {
     val mediaImage = imageProxy.image
@@ -570,17 +540,18 @@ private fun processPushUpDetection(
                         backStraight = false
                     }
 
-                    // Check for downward pushup motion
-                    if (elbowAngle < 100 && hipAngle > 140) {
-                        isGoingDown = true
-                        wasGoingDown = true
-                    }
+                    // ✅ Check dynamically if countdown is still running
+                    if (!isCountingDown()) {
+                        if (elbowAngle < 100 && hipAngle > 140) {
+                            isGoingDown = true
+                            wasGoingDown = true
+                        }
 
-                    // ✅ Count Only When Going Back Up After Fully Going Down
-                    if (wasGoingDown && isGoingDown && elbowAngle > 145 && hipAngle > 140 && backStraight) {
-                        pushUpCount++  // ✅ Increment only after a full rep
-                        isGoingDown = false  // ✅ Reset for next push-up
-                        wasGoingDown = false  // ✅ Prevent multiple counts
+                        if (wasGoingDown && isGoingDown && elbowAngle > 145 && hipAngle > 140 && backStraight) {
+                            pushUpCount++
+                            isGoingDown = false
+                            wasGoingDown = false
+                        }
                     }
 
                     // ✅ Send push-up count, angles, and skeleton keypoints to UI
