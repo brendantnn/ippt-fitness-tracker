@@ -6,6 +6,8 @@ import android.app.Activity
 import android.content.Context
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
+import android.media.MediaPlayer
+import android.media.SoundPool
 import android.util.Log
 import android.view.ViewGroup
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -34,6 +36,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.NavController
+import com.example.ippt.R
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.pose.PoseDetection
 import com.google.mlkit.vision.pose.PoseLandmark
@@ -98,6 +101,7 @@ fun PushupTrackerScreen(navController: NavController) {
 
 
 
+
     // Request camera permission
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -121,6 +125,8 @@ fun PushupTrackerScreen(navController: NavController) {
         } else {
             cameraPermissionLauncher.launch(android.Manifest.permission.CAMERA)
         }
+        playPositionSound(context)
+
         // Start the 10-second countdown
         isCountingDown = true
         for (i in 10 downTo 1) {
@@ -130,6 +136,8 @@ fun PushupTrackerScreen(navController: NavController) {
         countdownTimer = 0
         isCountingDown = false
     }
+
+
 
     // Start 60 second timer when 10 second timer ends
     LaunchedEffect(isCountingDown) {
@@ -157,6 +165,7 @@ fun PushupTrackerScreen(navController: NavController) {
                     keyPoints = newKeyPoints
                     isBackStraight = backStraight
                 }
+
 
                 // UI during 10sec timer
                 if (isCountingDown) {
@@ -347,6 +356,14 @@ fun PushupTrackerScreen(navController: NavController) {
         )
     }
 }
+var mediaPlayerPosition: MediaPlayer? = null
+
+fun playPositionSound(context: Context) {
+    if (mediaPlayerPosition == null) {
+        mediaPlayerPosition = MediaPlayer.create(context, R.raw.position) // Ensure position.mp3 is in res/raw
+    }
+    mediaPlayerPosition?.start()
+}
 
 
 @Composable
@@ -485,6 +502,10 @@ private var pushUpCount = 0  // ✅ Persist push-up count across frames
 private var isGoingDown = false  // ✅ Track downward movement
 private var wasGoingDown = false  // ✅ Prevent multiple counts
 private var backStraight = false
+private var mediaPlayer: MediaPlayer? = null
+private var mediaPlayerBack: MediaPlayer? = null
+private var lastBackWarningTime = 0L  // To prevent frequent playback
+
 
 private fun processPushUpDetection(
     imageProxy: ImageProxy,
@@ -538,6 +559,9 @@ private fun processPushUpDetection(
                         }
                     }.flatten()
 
+
+
+
                     // Check for back straightness
                     if (backAngle in 140.0..200.0 && legAngle in 160.0..200.0) {
                         backStraight = true
@@ -556,8 +580,18 @@ private fun processPushUpDetection(
                             pushUpCount++
                             isGoingDown = false
                             wasGoingDown = false
+                            playCorrectSound(context)
+
+                        }
+
+                        // Play "Straighten Back" sound if back is NOT straight (limit repeats)
+                        if (!backStraight && System.currentTimeMillis() - lastBackWarningTime > 3000) {
+                            lastBackWarningTime = System.currentTimeMillis()
+                            playBackWarningSound(context)
                         }
                     }
+
+
 
                     // ✅ Send push-up count, angles, and skeleton keypoints to UI
                     onDataUpdate(pushUpCount, elbowAngle, hipAngle, keyPoints, backStraight)
@@ -572,7 +606,19 @@ private fun processPushUpDetection(
     }
 }
 
+private fun playCorrectSound(context: Context) {
+    if (mediaPlayer == null) {
+        mediaPlayer = MediaPlayer.create(context, R.raw.correct) // Ensure correct.mp3 is in res/raw
+    }
+    mediaPlayer?.start()
+}
 
+private fun playBackWarningSound(context: Context) {
+    if (mediaPlayerBack == null) {
+        mediaPlayerBack = MediaPlayer.create(context, R.raw.back) // Ensure straighten_back.mp3 is in res/raw
+    }
+    mediaPlayerBack?.start()
+}
 
 
 
