@@ -13,9 +13,11 @@ fun NavGraph() {
     val navController = rememberNavController()
     val runViewModel: RunViewModel = viewModel()
 
+    val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
+
     Scaffold(
-        topBar = { TopNavBar() }, // Keeps the top bar consistent
-        bottomBar = { BottomNavBar(navController) } //Only one bottom navigation bar
+        topBar = { if (currentRoute != "pushup_tracker") TopNavBar() },
+        bottomBar = { if (currentRoute != "pushup_tracker") BottomNavBar(navController) }
     ) { paddingValues ->
         NavHost(
             navController = navController,
@@ -30,3 +32,4 @@ fun NavGraph() {
         }
     }
 }
+
