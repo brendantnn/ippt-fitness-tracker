@@ -94,6 +94,9 @@ fun PushupTrackerScreen(navController: NavController) {
     var isTimerRunning by remember { mutableStateOf(false) }
     var showSaveDialog by remember { mutableStateOf(false) }
 
+    val primaryColor = MaterialTheme.colorScheme.primary
+
+
 
     // Request camera permission
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
@@ -224,13 +227,13 @@ fun PushupTrackerScreen(navController: NavController) {
                                 Text(
                                     text = "$pushUpCount",
                                     style = MaterialTheme.typography.displayLarge,
-                                    color = Color(0xFF2196F3),
+                                    color =  primaryColor,
                                     modifier = Modifier.weight(0.5f)
                                 )
                                 Text(
                                     text = "PUSH UPS",
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = Color(0xFF2196F3),
+                                    color =  primaryColor,
                                     modifier = Modifier.weight(0.1f)
                                 )
                             }
@@ -269,13 +272,13 @@ fun PushupTrackerScreen(navController: NavController) {
                                 Text(
                                     text = "$timeLeft",
                                     style = MaterialTheme.typography.displayLarge,
-                                    color = Color(0xFF2196F3),
+                                    color =  primaryColor,
                                     modifier = Modifier.weight(0.5f)
                                 )
                                 Text(
                                     text = "SECONDS LEFT",
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = Color(0xFF2196F3),
+                                    color =  primaryColor,
                                     modifier = Modifier.weight(0.1f)
                                 )
 
@@ -353,6 +356,8 @@ fun DrawSkeletonLines(
     legStraight: Boolean,
     boxSize: Float // Controls the overall size of the skeleton
 ) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+
     Canvas(modifier = Modifier.fillMaxSize()) {
         if (keyPoints.isEmpty()) return@Canvas
 
@@ -387,9 +392,9 @@ fun DrawSkeletonLines(
         // Draw skeleton lines with conditional coloring
         normalizedKeyPoints.chunked(2).forEachIndexed { index, (start, end) ->
             val lineColor = when (index) {
-                2 -> if (!backStraight) Color.Red else Color(0xFF2196F3)
-                3 -> if (!backStraight) Color.Red else Color(0xFF2196F3)
-                else -> Color(0xFF2196F3)  // ⚪ Default color for other joints
+                2 -> if (!backStraight) Color.Red else primaryColor
+                3 -> if (!backStraight) Color.Red else primaryColor
+                else -> primaryColor  // ⚪ Default color for other joints
             }
 
             drawLine(
