@@ -48,7 +48,7 @@ fun HomeScreen(navController: NavController) {
         // Evenly spaced buttons
         Spacer(modifier = Modifier.weight(1f))
         GradientButton(
-            imageRes = R.drawable.ic_push_up,
+            imageRes = R.drawable.ic_push_upv2,
             text = "Push-Up Tracker",
             onClick = { navController.navigate("pushup") }
         )

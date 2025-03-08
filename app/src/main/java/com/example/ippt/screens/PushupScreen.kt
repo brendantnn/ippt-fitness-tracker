@@ -48,7 +48,7 @@ fun PushupScreen(navController: NavController) {
 
         Spacer(modifier = Modifier.weight(1f))
         GradientButton(
-            imageRes = R.drawable.ic_run,
+            imageRes = R.drawable.ic_ar_pushup,
             text = "View in AR",
             onClick = { navController.navigate("ar_view") }
         )
