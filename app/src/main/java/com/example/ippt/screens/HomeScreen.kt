@@ -35,32 +35,34 @@ fun HomeScreen(navController: NavController) {
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Greeting Text
+        // Greeting Text at the top
         Text(
             text = "Welcome to IPPT Fitness Tracker!",
             style = MaterialTheme.typography.headlineLarge,
-            color = MaterialTheme.colorScheme.primary
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.align(Alignment.Start).padding(bottom = 32.dp)
         )
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(2.dp))
 
-        // Push-Up Button
+        // Evenly spaced buttons
+        Spacer(modifier = Modifier.weight(1f))
         GradientButton(
             imageRes = R.drawable.ic_push_up,
             text = "Push-Up Tracker",
             onClick = { navController.navigate("pushup") }
         )
 
-        Spacer(modifier = Modifier.height(20.dp))
-
-        // Run Button
+        Spacer(modifier = Modifier.weight(1f))
         GradientButton(
             imageRes = R.drawable.ic_run,
             text = "Run Tracker",
             onClick = { navController.navigate("run") }
         )
+        Spacer(modifier = Modifier.weight(1f))
     }
 }
+
 
 
 @OptIn(ExperimentalMaterial3Api::class)

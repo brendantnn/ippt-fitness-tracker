@@ -12,9 +12,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import androidx.navigation.compose.rememberNavController
 import com.example.ippt.R
 
 @Composable
@@ -26,32 +28,34 @@ fun PushupScreen(navController: NavController) {
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Title
+        // Title at the top
         Text(
-            text = "Push-Up Tracker",
+            text = "Push-Up Tracker\n",
             style = MaterialTheme.typography.headlineLarge,
-            color = MaterialTheme.colorScheme.primary
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.align(Alignment.Start).padding(bottom = 32.dp)
         )
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(2.dp))
 
-        // Push-Up Tracker Button
+        // Evenly spaced buttons (matching HomeScreen)
+        Spacer(modifier = Modifier.weight(1f))
         GradientButton(
             imageRes = R.drawable.ic_push_up,
             text = "Start Tracking",
             onClick = { navController.navigate("pushup_tracker") }
         )
 
-        Spacer(modifier = Modifier.height(20.dp))
-
-        // AR View Button
+        Spacer(modifier = Modifier.weight(1f))
         GradientButton(
             imageRes = R.drawable.ic_run,
             text = "View in AR",
             onClick = { navController.navigate("ar_view") }
         )
+        Spacer(modifier = Modifier.weight(1f))
     }
 }
+
 
 @Composable
 fun PushUpGradientButton(imageRes: Int, text: String, onClick: () -> Unit) {
@@ -89,4 +93,10 @@ fun PushUpGradientButton(imageRes: Int, text: String, onClick: () -> Unit) {
             )
         }
     }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun PushupScreenPreview() {
+    PushupScreen(navController = rememberNavController())
 }
