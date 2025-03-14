@@ -76,7 +76,7 @@ fun SitupTrackerScreen(navController: NavController){
     val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
     var isCameraOn by remember { mutableStateOf(false) }
     var hasCameraPermission by remember { mutableStateOf(false) }
-    var pushUpCount by remember { mutableStateOf(0) }
+    var sitUpCount by remember { mutableStateOf(0) }
     var elbowAngle by remember { mutableStateOf(0.0) }
     var backAngle by remember { mutableStateOf(0.0) }
     var legAngle by remember { mutableStateOf(0.0) }
@@ -153,7 +153,7 @@ fun SitupTrackerScreen(navController: NavController){
         if (hasCameraPermission) {
             val lifecycleOwner = LocalLifecycleOwner.current
             CameraPreview(context, lifecycleOwner, { isCountingDown }, cameraExecutor) { newCount, newElbowAngle, newHipAngle, newKeyPoints, backStraight ->
-                pushUpCount = newCount
+                sitUpCount = newCount
                 elbowAngle = newElbowAngle
                 hipAngle = newHipAngle
                 keyPoints = newKeyPoints
