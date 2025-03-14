@@ -25,7 +25,6 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.ippt.R
 
-
 @Composable
 fun HomeScreen(navController: NavController) {
     Column(
@@ -59,11 +58,17 @@ fun HomeScreen(navController: NavController) {
             text = "Run Tracker",
             onClick = { navController.navigate("run") }
         )
+
+        Spacer(modifier = Modifier.weight(1f))
+        GradientButton(
+            imageRes = R.drawable.ic_sit_up, // Replace with the actual sit-up image resource
+            text = "Sit-Up Tracker",
+            onClick = { navController.navigate("sit-up") }
+        )
+
         Spacer(modifier = Modifier.weight(1f))
     }
 }
-
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -145,7 +150,6 @@ fun BottomNavBar(navController: NavController) {
         }
     }
 }
-
 
 data class NavItem(val title: String, val route: String, val icon: androidx.compose.ui.graphics.vector.ImageVector)
 

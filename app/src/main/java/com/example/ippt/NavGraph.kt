@@ -16,8 +16,8 @@ fun NavGraph() {
     val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
 
     Scaffold(
-        topBar = { if (currentRoute != "pushup_tracker") TopNavBar() },
-        bottomBar = { if (currentRoute != "pushup_tracker") BottomNavBar(navController) }
+        topBar = { if (currentRoute !in listOf("sit-up", "pushup_tracker")) TopNavBar() },
+        bottomBar = { if (currentRoute !in listOf("sit-up", "pushup_tracker")) BottomNavBar(navController) }
     ) { paddingValues ->
         NavHost(
             navController = navController,
@@ -29,6 +29,7 @@ fun NavGraph() {
             composable("pushup_tracker") { PushupTrackerScreen(navController) }
             composable("ar_view") { ARView(navController) }
             composable("run") { RunScreen(navController, runViewModel) }
+            composable("sit-up"){SitupTrackerScreen(navController)}
         }
     }
 }
