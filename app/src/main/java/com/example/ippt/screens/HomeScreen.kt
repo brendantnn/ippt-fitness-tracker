@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Accessibility
 import androidx.compose.material.icons.filled.DirectionsRun
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Home
@@ -16,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -44,26 +46,26 @@ fun HomeScreen(navController: NavController) {
 
         Spacer(modifier = Modifier.height(2.dp))
 
-        // Evenly spaced buttons
+        // Push up
         Spacer(modifier = Modifier.weight(1f))
         GradientButton(
             imageRes = R.drawable.ic_push_upv2,
             text = "Push-Up Tracker",
             onClick = { navController.navigate("pushup") }
         )
-
-        Spacer(modifier = Modifier.weight(1f))
-        GradientButton(
-            imageRes = R.drawable.ic_run,
-            text = "Run Tracker",
-            onClick = { navController.navigate("run") }
-        )
-
+        //Sit up
         Spacer(modifier = Modifier.weight(1f))
         GradientButton(
             imageRes = R.drawable.ic_sit_up, // Replace with the actual sit-up image resource
             text = "Sit-Up Tracker",
             onClick = { navController.navigate("sit-up") }
+        )
+        //Running
+        Spacer(modifier = Modifier.weight(1f))
+        GradientButton(
+            imageRes = R.drawable.ic_run,
+            text = "Run Tracker",
+            onClick = { navController.navigate("run") }
         )
 
         Spacer(modifier = Modifier.weight(1f))
@@ -88,8 +90,8 @@ fun GradientButton(imageRes: Int, text: String, onClick: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(160.dp)
-            .shadow(6.dp, shape = RoundedCornerShape(12.dp)) //shadow for depth
+            .height(140.dp)
+            .shadow(10.dp, shape = RoundedCornerShape(12.dp)) //shadow for depth
             .clickable { onClick() },
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
@@ -127,7 +129,8 @@ fun GradientButton(imageRes: Int, text: String, onClick: () -> Unit) {
 fun BottomNavBar(navController: NavController) {
     val items = listOf(
         NavItem("Home", "home", Icons.Filled.Home),
-        NavItem("Pushups", "pushup", Icons.Filled.FitnessCenter),
+        NavItem("Pushups", "pushup", null), // Pushups now uses a custom image
+        NavItem("Situps", "sit-up", null),  // Situps also uses a custom image
         NavItem("Run", "run", Icons.Filled.DirectionsRun)
     )
 
@@ -136,7 +139,33 @@ fun BottomNavBar(navController: NavController) {
 
         items.forEach { item ->
             NavigationBarItem(
-                icon = { Icon(item.icon, contentDescription = item.title) },
+                icon = {
+                    when (item.title) {
+                        "Pushups" -> {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_pushup_logo), // Custom pushup icon
+                                contentDescription = item.title,
+                                modifier = Modifier.size(25.dp), // Adjust size for Pushup
+                                tint = LocalContentColor.current
+                            )
+                        }
+                        "Situps" -> {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_situp_logo), // Custom situp icon
+                                contentDescription = item.title,
+                                modifier = Modifier.size(25.dp), // Adjust size for Situp
+                                tint = LocalContentColor.current
+                            )
+                        }
+                        else -> {
+                            Icon(
+                                imageVector = item.icon!!,
+                                contentDescription = item.title,
+                                modifier = Modifier.size(24.dp) // Default size for other icons
+                            )
+                        }
+                    }
+                },
                 label = { Text(item.title) },
                 selected = currentRoute == item.route,
                 onClick = { navController.navigate(item.route) },
@@ -151,7 +180,18 @@ fun BottomNavBar(navController: NavController) {
     }
 }
 
-data class NavItem(val title: String, val route: String, val icon: androidx.compose.ui.graphics.vector.ImageVector)
+
+// Update NavItem to support both ImageVector and Painter
+data class NavItem(
+    val title: String,
+    val route: String,
+    val icon: ImageVector? // Allow nullable type
+)
+
+
+
+
+//data class NavItem(val title: String, val route: String, val icon: androidx.compose.ui.graphics.vector.ImageVector)
 
 @Preview(showBackground = true)
 @Composable

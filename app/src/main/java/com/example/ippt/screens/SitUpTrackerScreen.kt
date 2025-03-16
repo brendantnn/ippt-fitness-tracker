@@ -121,7 +121,7 @@ fun SitupTrackerScreen(navController: NavController){
         } else {
             cameraPermissionLauncher.launch(android.Manifest.permission.CAMERA)
         }
-        playPositionSound(context)
+        //playPositionSound(context)
 
         // Start the 10-second countdown
         isCountingDown = true
@@ -147,17 +147,17 @@ fun SitupTrackerScreen(navController: NavController){
         }
     }
 
+    //Main UI
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
 
         // Start camera preview if permission is granted
         if (hasCameraPermission) {
             val lifecycleOwner = LocalLifecycleOwner.current
-            CameraPreview(context, lifecycleOwner, { isCountingDown }, cameraExecutor) { newCount, newElbowAngle, newHipAngle, newKeyPoints, backStraight ->
+            CameraPreview2(context, lifecycleOwner, { isCountingDown }, cameraExecutor) {
+                    newCount, newBackAngle, newKeyPoints, isUp ->
                 sitUpCount = newCount
-                elbowAngle = newElbowAngle
-                hipAngle = newHipAngle
+                backAngle = newBackAngle
                 keyPoints = newKeyPoints
-                isBackStraight = backStraight
             }
 
             if (isCountingDown) {
@@ -290,23 +290,41 @@ fun SitupTrackerScreen(navController: NavController){
 
 
 }
+@SuppressLint("UnsafeOptInUsageError")
+@Composable
+fun CameraPreview2(
+    context: Context,
+    lifecycleOwner: LifecycleOwner,
+    isCountingDown: () -> Boolean,
+    cameraExecutor: ExecutorService,
+    onDataUpdate: (Int, Double, List<Pair<Float, Float>>, Boolean) -> Unit
+) {
+    val previewView = remember { PreviewView(context) }
+
+    LaunchedEffect(Unit) {
+        startCameras(previewView, context, lifecycleOwner, cameraExecutor, isCountingDown, onDataUpdate)
+    }
+
+    AndroidView(
+        modifier = Modifier.fillMaxSize(),
+        factory = { previewView }
+    )
+}
 
 
-private fun startCamera(
+private fun startCameras(
     previewView: PreviewView,
     context: Context,
     lifecycleOwner: LifecycleOwner,
     cameraExecutor: ExecutorService,
     isCountingDown: () -> Boolean,
-    onDataUpdate: (Int, Double, Double, List<Pair<Float, Float>>, Boolean) -> Unit
+    onDataUpdate: (Int, Double, List<Pair<Float, Float>>, Boolean) -> Unit
 ) {
     val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
 
     cameraProviderFuture.addListener({
         val cameraProvider = cameraProviderFuture.get()
-
         try {
-            // Unbind all use cases before binding again
             cameraProvider.unbindAll()
 
             val preview = Preview.Builder()
@@ -319,25 +337,20 @@ private fun startCamera(
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .build().also {
                     it.setAnalyzer(cameraExecutor) { imageProxy ->
-                        processSitUpDetection(imageProxy, context, isCountingDown) { newCount, newElbowAngle, newHipAngle, newKeyPoints, backStraight ->
-                            // Always update state, but only count push-ups after countdown ends
-                            onDataUpdate(newCount, newElbowAngle, newHipAngle, newKeyPoints, backStraight)
+                        processSitUpDetection(imageProxy, context, isCountingDown) { newCount, newBackAngle, newKeyPoints, isUp ->
+                            onDataUpdate(newCount, newBackAngle, newKeyPoints, isUp)
                         }
                     }
                 }
-
 
             val cameraSelector = CameraSelector.Builder()
                 .requireLensFacing(CameraSelector.LENS_FACING_BACK)
                 .build()
 
-            // ✅ Bind the new use cases safely
             cameraProvider.bindToLifecycle(lifecycleOwner, cameraSelector, preview, imageAnalyzer)
-
         } catch (e: Exception) {
             Log.e("CameraDebug", "Failed to start camera: ${e.message}")
         }
-
     }, ContextCompat.getMainExecutor(context))
 }
 
@@ -353,7 +366,7 @@ fun getSitUpAngle(
     val point2 = landmarks.find { it.landmarkType == p2 }?.position
     val point3 = landmarks.find { it.landmarkType == p3 }?.position
 
-    if (point1 == null || point2 == null || point3 == null) return 0.0  // Prevent crashes if keypoints are missing
+    if (point1 == null || point2 == null || point3 == null) return 0.0 // Prevent crashes if keypoints are missing
 
     val angle = Math.toDegrees(
         atan2((point3.y - point2.y).toDouble(), (point3.x - point2.x).toDouble()) -
@@ -364,116 +377,77 @@ fun getSitUpAngle(
 }
 
 
+
 //for sit up detection
-private var sitUpCount = 0  //Persist sit-up count across frames
-private var isGoingUp = false  // Track upward movement
-private var wasGoingUp = false  //Prevent multiple counts
-private var backStraight = false
-private var mediaPlayer: MediaPlayer? = null
-private var mediaPlayerBack: MediaPlayer? = null
-private var lastBackWarningTime = 0L  // To prevent frequent playback
+private var sitUpCount = 0 // Keep track of sit-ups
+private var wasGoingUp = false // Track upward movement
 
 private fun processSitUpDetection(
     imageProxy: ImageProxy,
     context: Context,
     isCountingDown: () -> Boolean,
-    onDataUpdate: (Int, Double, Double, List<Pair<Float, Float>>, Boolean) -> Unit
+    onDataUpdate: (Int, Double, List<Pair<Float, Float>>, Boolean) -> Unit
 ) {
-    val mediaImage = imageProxy.image
-    if (mediaImage != null) {
-        val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
+    val mediaImage = imageProxy.image ?: return
+    val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
 
-        // Create instance of PoseDetector
-        val options = AccuratePoseDetectorOptions.Builder()
-            .setDetectorMode(AccuratePoseDetectorOptions.STREAM_MODE)
-            .build()
-        val poseDetector = PoseDetection.getClient(options)
+    val options = AccuratePoseDetectorOptions.Builder()
+        .setDetectorMode(AccuratePoseDetectorOptions.STREAM_MODE)
+        .build()
+    val poseDetector = PoseDetection.getClient(options)
 
-        poseDetector.process(image)
-            .addOnSuccessListener { pose ->
-                val landmarks = pose.allPoseLandmarks
-                if (landmarks.isNotEmpty()) {
-                    // ✅ Measure back angle relative to leg (most important for sit-up detection)
-                    val backToLegAngle = getSitUpAngle(
-                        landmarks,
-                        PoseLandmark.LEFT_SHOULDER, // Upper Body (A)
-                        PoseLandmark.LEFT_HIP,      // Pivot - Hip (B)
-                        PoseLandmark.LEFT_KNEE      // Thigh (C)
-                    )
+    poseDetector.process(image)
+        .addOnSuccessListener { pose ->
+            val landmarks = pose.allPoseLandmarks
+            if (landmarks.isNotEmpty()) {
+                val backToHipAngle = getSitUpAngle(
+                    landmarks,
+                    PoseLandmark.LEFT_SHOULDER,
+                    PoseLandmark.LEFT_HIP,
+                    PoseLandmark.LEFT_KNEE
+                )
 
-                    // ✅ Measure hip angle separately (to track leg position)
-                    val hipAngle = getSitUpAngle(
-                        landmarks,
-                        PoseLandmark.LEFT_HIP,      // Hip (A)
-                        PoseLandmark.LEFT_KNEE,     // Knee (B)
-                        PoseLandmark.LEFT_ANKLE     // Foot (C)
-                    )
+                Log.d("SitUpTracker", "Back-to-Hip Angle: $backToHipAngle")
 
-                    // ✅ Extract keypoint positions for skeleton overlay
-                    val keyPoints = listOf(
-                        PoseLandmark.LEFT_SHOULDER to PoseLandmark.LEFT_HIP,
-                        PoseLandmark.LEFT_HIP to PoseLandmark.LEFT_KNEE,
-                        PoseLandmark.LEFT_KNEE to PoseLandmark.LEFT_ANKLE
-                    ).mapNotNull { (start, end) ->
-                        val startPoint = landmarks.find { it.landmarkType == start }?.position
-                        val endPoint = landmarks.find { it.landmarkType == end }?.position
-                        if (startPoint != null && endPoint != null) {
-                            listOf(Pair(startPoint.x, startPoint.y), Pair(endPoint.x, endPoint.y))
-                        } else {
-                            null
-                        }
-                    }.flatten()
-
-                    // ✅ Debugging logs (to check if detection is correct)
-                    Log.d("SitUpTracker", "Detected Angles: Back-to-Leg: $backToLegAngle | Hip: $hipAngle")
-                    Log.d("SitUpTracker", "Previous Count: $sitUpCount | isGoingUp: $isGoingUp | wasGoingUp: $wasGoingUp")
-
-                    // ✅ Check if the back is straight (lying down position)
-                    backStraight = backToLegAngle in 140.0..200.0 && hipAngle in 160.0..200.0
-
-                    // ✅ Only detect sit-ups if countdown is over
-                    if (!isCountingDown()) {
-                        // 🔴 LOG USER MOVEMENT FOR DEBUGGING
-                        if (backToLegAngle < 100) { // Sit-Up Detected
-                            if (!isGoingUp) {
-                                Log.d("SitUpTracker", "User is Moving Up (Sit-Up Detected)")
-                            }
-                            isGoingUp = true
-                            wasGoingUp = true
-                        }
-
-                        // 🔵 LOG USER RETURN TO START
-                        if (wasGoingUp && isGoingUp && backToLegAngle > 130 && backStraight) {
-                            sitUpCount++
-                            isGoingUp = false
-                            wasGoingUp = false
-
-                            Log.d("SitUpTracker", "✅ Sit-Up Counted! New Count: $sitUpCount")
-
-                            // ✅ Play sound to indicate a successful sit-up (uncomment to enable)
-                            // playCorrectSound(context)
-                        }
-
-                        // ⚠️ Warn if back is NOT straight (limit repeats)
-                        if (!backStraight && System.currentTimeMillis() - lastBackWarningTime > 3000) {
-                            lastBackWarningTime = System.currentTimeMillis()
-                            Log.d("SitUpTracker", "⚠️ Warning: Keep Your Back Straight!")
-                        }
+                val keyPoints = listOf(
+                    PoseLandmark.LEFT_SHOULDER to PoseLandmark.LEFT_HIP,
+                    PoseLandmark.LEFT_HIP to PoseLandmark.LEFT_KNEE
+                ).mapNotNull { (start, end) ->
+                    val startPoint = landmarks.find { it.landmarkType == start }?.position
+                    val endPoint = landmarks.find { it.landmarkType == end }?.position
+                    if (startPoint != null && endPoint != null) {
+                        listOf(Pair(startPoint.x, startPoint.y), Pair(endPoint.x, endPoint.y))
+                    } else {
+                        null
                     }
+                }.flatten()
 
-                    // ✅ Send updated data to UI
-                    onDataUpdate(sitUpCount, backToLegAngle, hipAngle, keyPoints, backStraight)
-                } else {
-                    Log.e("SitUpTracker", "❌ No Pose Detected!")
+                var isUp = false
+                if (!isCountingDown()) {
+                    if (backToHipAngle < 50) { // Sit-up "up" position
+                        if (!wasGoingUp) {
+                            sitUpCount++
+                            wasGoingUp = true
+                            Log.d("SitUpTracker", "Sit-Up Counted! Total: $sitUpCount")
+                        }
+                        isUp = true
+                    } else if (backToHipAngle > 110) { // "Down" position
+                        wasGoingUp = false
+                        isUp = false
+                    }
                 }
+
+                onDataUpdate(sitUpCount, backToHipAngle, keyPoints, isUp)
+            } else {
+                Log.e("SitUpTracker", "No Pose Detected!")
             }
-            .addOnFailureListener { e ->
-                Log.e("SitUpTracker", "Pose Detection Failed: ${e.message}", e)
-            }
-            .addOnCompleteListener {
-                imageProxy.close()
-            }
-    }
+        }
+        .addOnFailureListener { e ->
+            Log.e("SitUpTracker", "Pose Detection Failed: ${e.message}", e)
+        }
+        .addOnCompleteListener {
+            imageProxy.close()
+        }
 }
 
 
@@ -529,15 +503,30 @@ fun SitUpOutline(modifier: Modifier = Modifier) {
     }
 }
 
-
-
-
-
-
-
-
-
-
-
-
+@Composable
+fun SitUpTrackerUI(
+    sitUpCount: Int,
+    backAngle: Double
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = "Sit-Ups: $sitUpCount",
+            style = MaterialTheme.typography.displayMedium,
+            color = Color.White
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = "Back Angle: ${backAngle.toInt()}°",
+            style = MaterialTheme.typography.bodyLarge,
+            color = Color.White
+        )
+    }
+}
 
