@@ -344,7 +344,7 @@ private fun startCameras(
                 }
 
             val cameraSelector = CameraSelector.Builder()
-                .requireLensFacing(CameraSelector.LENS_FACING_BACK)
+                .requireLensFacing(CameraSelector.LENS_FACING_FRONT)
                 .build()
 
             cameraProvider.bindToLifecycle(lifecycleOwner, cameraSelector, preview, imageAnalyzer)
@@ -462,15 +462,15 @@ fun SitUpOutline(modifier: Modifier = Modifier) {
         val strokeWidth = 8f
         val outlineColor = Color.White.copy(alpha = 0.7f)  // Improve visibility
 
-        // Define key points with a longer torso
+        // Define key points with the head on the right side
         val headRadius = 100f
-        val headCenter = Offset(size.width * 0.35f, size.height * 0.7f) // Head lower
+        val headCenter = Offset(size.width * 0.65f, size.height * 0.7f) // Head on the right
 
-        val shoulder = Offset(size.width * 0.40f, size.height * 0.7f) // Shoulders lower
-        val hip = Offset(size.width * 0.55f, size.height * 0.7f) // Hips lower and further from shoulders
+        val shoulder = Offset(size.width * 0.60f, size.height * 0.7f) // Shoulders to the left of the head
+        val hip = Offset(size.width * 0.45f, size.height * 0.7f) // Hips further left
 
-        val knee = Offset(size.width * 0.65f, size.height * 0.50f)  // Knees bent upwards
-        val foot = Offset(size.width * 0.75f, size.height * 0.70f)  // Feet planted on ground
+        val knee = Offset(size.width * 0.35f, size.height * 0.50f)  // Knees bent upwards
+        val foot = Offset(size.width * 0.25f, size.height * 0.70f)  // Feet planted on ground
 
         // Draw Head
         drawCircle(
@@ -502,6 +502,7 @@ fun SitUpOutline(modifier: Modifier = Modifier) {
         )
     }
 }
+
 
 @Composable
 fun SitUpTrackerUI(
