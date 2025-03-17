@@ -221,6 +221,26 @@ fun PushupTrackerScreen(navController: NavController) {
                         modifier = Modifier
                             .fillMaxWidth()
                     ) {
+                        Text(
+                            text = "Elbow Angle: ${elbowAngle.toInt()}°",
+                            color = if (elbowAngle < 100) Color.Red else Color.White,
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                        Text(
+                            text = "Hip Angle: ${hipAngle.toInt()}°",
+                            color = if (hipAngle < 140) Color.Red else Color.White,
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                        Text(
+                            text = "Back Angle: ${backAngle.toInt()}°",
+                            color = if (backAngle in 140.0..200.0) Color.Green else Color.Red,
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                        Text(
+                            text = "Leg Angle: ${legAngle.toInt()}°",
+                            color = if (legAngle in 160.0..200.0) Color.Green else Color.Red,
+                            style = MaterialTheme.typography.bodyLarge
+                        )
                         Box(
                             modifier = Modifier
                                 .weight(0.3f)
@@ -365,7 +385,6 @@ fun playPositionSound(context: Context) {
     mediaPlayerPosition?.start()
 }
 
-
 @Composable
 fun DrawSkeletonLines(
     keyPoints: List<Pair<Float, Float>>,
@@ -387,7 +406,6 @@ fun DrawSkeletonLines(
         val widthRange = maxX - minX
         val heightRange = maxY - minY
 
-        // Increase scale factor to enlarge the skeleton
         val scaleMultiplier = 1.5f  // Increase this value for a bigger skeleton
         val scale = scaleMultiplier * if (widthRange > heightRange) {
             boxSize / widthRange
@@ -395,34 +413,33 @@ fun DrawSkeletonLines(
             boxSize / heightRange
         }
 
-        // Center offsets to position the skeleton
         val centerX = size.width / 2
         val centerY = size.height / 2
 
-        // Normalize and scale keypoints
+        // **Fix: Mirror X-coordinates for Front Camera**
         val normalizedKeyPoints = keyPoints.map { (x, y) ->
-            val scaledX = ((x - minX) * scale) - (widthRange * scale / 2)
+            val flippedX = size.width - ((x - minX) * scale)  // Flip horizontally
             val scaledY = ((y - minY) * scale) - (heightRange * scale / 2)
-            Pair(centerX + scaledX, centerY + scaledY)
+            Pair(flippedX, centerY + scaledY)
         }
 
         // Draw skeleton lines with conditional coloring
         normalizedKeyPoints.chunked(2).forEachIndexed { index, (start, end) ->
             val lineColor = when (index) {
-                2 -> if (!backStraight) Color.Red else primaryColor
-                3 -> if (!backStraight) Color.Red else primaryColor
-                else -> primaryColor  // ⚪ Default color for other joints
+                2, 3 -> if (!backStraight) Color.Red else primaryColor
+                else -> primaryColor
             }
 
             drawLine(
                 color = lineColor,
                 start = Offset(start.first, start.second),
                 end = Offset(end.first, end.second),
-                strokeWidth = 6f  // Thicker lines for better visibility
+                strokeWidth = 6f
             )
         }
     }
 }
+
 
 @SuppressLint("UnsafeOptInUsageError")
 @Composable
@@ -625,17 +642,23 @@ private fun playBackWarningSound(context: Context) {
 
 //Get angle between 3 joints
 private fun getAngle(landmarks: List<PoseLandmark>, p1: Int, p2: Int, p3: Int): Double {
-    val point1 = landmarks[p1].position
-    val point2 = landmarks[p2].position
-    val point3 = landmarks[p3].position
+    val point1 = landmarks.find { it.landmarkType == p1 }?.position ?: return 0.0
+    val point2 = landmarks.find { it.landmarkType == p2 }?.position ?: return 0.0
+    val point3 = landmarks.find { it.landmarkType == p3 }?.position ?: return 0.0
+
+    // Adjust for Mirrored Camera
+    val correctedX1 = -point1.x
+    val correctedX2 = -point2.x
+    val correctedX3 = -point3.x
 
     val angle = Math.toDegrees(
-        atan2((point3.y - point2.y).toDouble(), (point3.x - point2.x).toDouble()) -
-                atan2((point1.y - point2.y).toDouble(), (point1.x - point2.x).toDouble())
+        atan2((point3.y - point2.y).toDouble(), (correctedX3 - correctedX2).toDouble()) -
+                atan2((point1.y - point2.y).toDouble(), (correctedX1 - correctedX2).toDouble())
     )
 
     return if (angle < 0) angle + 360 else angle
 }
+
 
 
 @Composable
