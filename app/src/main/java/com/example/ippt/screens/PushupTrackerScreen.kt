@@ -221,26 +221,7 @@ fun PushupTrackerScreen(navController: NavController) {
                         modifier = Modifier
                             .fillMaxWidth()
                     ) {
-                        Text(
-                            text = "Elbow Angle: ${elbowAngle.toInt()}°",
-                            color = if (elbowAngle < 100) Color.Red else Color.White,
-                            style = MaterialTheme.typography.bodyLarge
-                        )
-                        Text(
-                            text = "Hip Angle: ${hipAngle.toInt()}°",
-                            color = if (hipAngle < 140) Color.Red else Color.White,
-                            style = MaterialTheme.typography.bodyLarge
-                        )
-                        Text(
-                            text = "Back Angle: ${backAngle.toInt()}°",
-                            color = if (backAngle in 140.0..200.0) Color.Green else Color.Red,
-                            style = MaterialTheme.typography.bodyLarge
-                        )
-                        Text(
-                            text = "Leg Angle: ${legAngle.toInt()}°",
-                            color = if (legAngle in 160.0..200.0) Color.Green else Color.Red,
-                            style = MaterialTheme.typography.bodyLarge
-                        )
+                     
                         Box(
                             modifier = Modifier
                                 .weight(0.3f)
