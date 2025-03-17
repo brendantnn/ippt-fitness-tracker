@@ -29,6 +29,7 @@ fun NavGraph() {
             composable("pushup_tracker") { PushupTrackerScreen(navController) }
             composable("ar_view") { ARView(navController) }
             composable("run") { RunScreen(navController, runViewModel) }
+            composable("run_summary") { RunSummaryScreen(navController, runViewModel) }
             composable("sit-up"){SitupTrackerScreen(navController)}
         }
     }

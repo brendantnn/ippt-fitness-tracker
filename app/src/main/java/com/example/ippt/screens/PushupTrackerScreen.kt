@@ -483,7 +483,7 @@ private fun startCamera(
 
 
             val cameraSelector = CameraSelector.Builder()
-                .requireLensFacing(CameraSelector.LENS_FACING_BACK)
+                .requireLensFacing(CameraSelector.LENS_FACING_FRONT)
                 .build()
 
             // ✅ Bind the new use cases safely
