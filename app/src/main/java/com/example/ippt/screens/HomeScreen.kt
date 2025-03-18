@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Accessibility
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.DirectionsRun
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Home
@@ -131,7 +132,8 @@ fun BottomNavBar(navController: NavController) {
         NavItem("Home", "home", Icons.Filled.Home),
         NavItem("Pushups", "pushup", null), // Pushups now uses a custom image
         NavItem("Situps", "sit-up", null),  // Situps also uses a custom image
-        NavItem("Run", "run", Icons.Filled.DirectionsRun)
+        NavItem("Run", "run", Icons.Filled.DirectionsRun),
+        NavItem("Profile", "profile", Icons.Filled.AccountCircle)
     )
 
     NavigationBar(containerColor = MaterialTheme.colorScheme.primary) {

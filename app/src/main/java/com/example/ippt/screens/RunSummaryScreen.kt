@@ -1,6 +1,8 @@
 package com.example.ippt.screens
 
 
+import android.content.Context
+import android.content.SharedPreferences
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -11,6 +13,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -19,10 +22,16 @@ import androidx.navigation.NavController
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.*
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RunSummaryScreen(navController: NavController, viewModel: RunViewModel) {
+    val context = LocalContext.current
+    val sharedPreferences = context.getSharedPreferences("IPPT_DATA", Context.MODE_PRIVATE)
+
     val distance by viewModel.distance.collectAsState()
     val timeElapsed by viewModel.timeElapsed.collectAsState()
     val elevationGain by viewModel.elevationGain.collectAsState()
@@ -34,6 +43,23 @@ fun RunSummaryScreen(navController: NavController, viewModel: RunViewModel) {
 
     val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(lastLocation, 15f)
+    }
+
+    // Function to save data
+    fun saveRunData() {
+        val editor: SharedPreferences.Editor = sharedPreferences.edit()
+        val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
+
+        // Format run summary as a single entry
+        val runSummary = "Date: $timestamp | Distance: ${String.format("%.2f", distance)} km | Time: ${formatTime(timeElapsed)} | Elevation: ${String.format("%.1f", elevationGain)} m | Steps: $steps"
+
+        // Retrieve existing run history
+        val existingData = sharedPreferences.getString("run_history", "") ?: ""
+        val updatedData = if (existingData.isEmpty()) runSummary else "$existingData\n$runSummary"
+
+        // Save the updated history
+        editor.putString("run_history", updatedData)
+        editor.apply()
     }
 
     Scaffold(
@@ -89,11 +115,11 @@ fun RunSummaryScreen(navController: NavController, viewModel: RunViewModel) {
             }
 
             Button(
-                onClick = { viewModel.resetRunData(); navController.navigate("home") },
+                onClick = { saveRunData(); viewModel.resetRunData(); navController.navigate("home") },
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF5722))
             ) {
-                Text(text = "View Analysis", color = Color.White)
+                Text(text = "Save", color = Color.White)
             }
         }
     }

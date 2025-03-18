@@ -31,6 +31,7 @@ fun NavGraph() {
             composable("run") { RunScreen(navController, runViewModel) }
             composable("run_summary") { RunSummaryScreen(navController, runViewModel) }
             composable("sit-up"){SitupTrackerScreen(navController)}
+            composable("profile") { ProfileScreen(navController)}
         }
     }
 }

@@ -4,6 +4,7 @@ import android.R.attr.text
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
+import android.content.SharedPreferences
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.media.MediaPlayer
@@ -44,6 +45,9 @@ import com.google.mlkit.vision.pose.accurate.AccuratePoseDetectorOptions
 import com.google.mlkit.vision.pose.defaults.PoseDetectorOptions
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlin.math.atan2
@@ -52,6 +56,7 @@ import kotlin.math.atan2
 @Composable
 fun PushupTrackerScreen(navController: NavController) {
     val context = LocalContext.current
+    val sharedPreferences = context.getSharedPreferences("IPPT_DATA", Context.MODE_PRIVATE)
     val activity = context as? Activity
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -99,7 +104,13 @@ fun PushupTrackerScreen(navController: NavController) {
 
     val primaryColor = MaterialTheme.colorScheme.primary
 
-
+    // Function to save data
+    fun savePushupData(count: Int) {
+        val editor: SharedPreferences.Editor = sharedPreferences.edit()
+        val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
+        editor.putString("pushup_$timestamp", count.toString())
+        editor.apply()
+    }
 
 
     // Request camera permission
@@ -338,11 +349,11 @@ fun PushupTrackerScreen(navController: NavController) {
             text = { Text("You completed $pushUpCount push-ups. Do you want to save the session?") },
             confirmButton = {
                 Button(onClick = {
-                    // TODO: Implement Save Logic (e.g., store push-up count in a database)
-                    showSaveDialog = false
-                    navController.popBackStack()  // Navigate back after saving
+                    savePushupData(pushUpCount)
+                    pushUpCount = 0
+                    navController.navigate("profile")
                 }) {
-                    Text("Save")
+                    Text("Finish Set: ($pushUpCount pushups)")
                 }
             },
             dismissButton = {
