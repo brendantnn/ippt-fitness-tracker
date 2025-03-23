@@ -152,6 +152,7 @@ fun PushupTrackerScreen(navController: NavController) {
                 timeLeft -= 1
             }
             isTimerRunning = false
+            isCameraOn = false // Turn off the camera
             showSaveDialog = true // Show save/discard options when time runs out
         }
     }
@@ -159,7 +160,7 @@ fun PushupTrackerScreen(navController: NavController) {
     // Main UI
     Box(modifier = Modifier.fillMaxSize()) {
         // Start camera preview if permission is granted
-        if (hasCameraPermission) {
+        if (hasCameraPermission  && isCameraOn) {
                 val lifecycleOwner = LocalLifecycleOwner.current
                 CameraPreview(context, lifecycleOwner, { isCountingDown }, isTimerRunning = { isTimerRunning }, cameraExecutor) { newCount, newElbowAngle, newHipAngle, newKeyPoints, backStraight ->
                     pushUpCount = newCount
@@ -254,7 +255,7 @@ fun PushupTrackerScreen(navController: NavController) {
 
                         Box(
                             modifier = Modifier
-                                .weight(0.7f)
+                                .weight(0.6f)
                                 .height(80.dp)
                                 .background(Color.DarkGray.copy(alpha = 0.8f))
                                 .padding(10.dp)
@@ -351,6 +352,7 @@ fun PushupTrackerScreen(navController: NavController) {
             dismissButton = {
                 Button(onClick = {
                     pushUpCount = 0  // Reset push-up count
+                    isCameraOn = true // Restart camera when returning
                     showSaveDialog = false
                     navController.popBackStack()  // Navigate back
                 }) {
@@ -390,7 +392,7 @@ fun DrawSkeletonLines(
         val widthRange = maxX - minX
         val heightRange = maxY - minY
 
-        val scaleMultiplier = 1.5f  // Increase this value for a bigger skeleton
+        val scaleMultiplier = 2f  // Increase this value for a bigger skeleton
         val scale = scaleMultiplier * if (widthRange > heightRange) {
             boxSize / widthRange
         } else {
