@@ -1,8 +1,11 @@
 package com.example.ippt.screens
-
-
+import com.example.ippt.data.ExerciseEntry
+import com.example.ippt.data.RunPathPoint
+import com.example.ippt.data.IPPTDatabase
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import android.content.Context
-import android.content.SharedPreferences
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -28,7 +31,6 @@ import java.util.Locale
 @Composable
 fun RunSummaryScreen(navController: NavController, viewModel: RunViewModel) {
     val context = LocalContext.current
-    val sharedPreferences = context.getSharedPreferences("IPPT_DATA", Context.MODE_PRIVATE)
 
     val distance by viewModel.distance.collectAsState()
     val timeElapsed by viewModel.timeElapsed.collectAsState()
@@ -44,19 +46,25 @@ fun RunSummaryScreen(navController: NavController, viewModel: RunViewModel) {
     }
 
     // Function to save data
-    fun saveRunData() {
-        val editor: SharedPreferences.Editor = sharedPreferences.edit()
+    fun saveRunData(context: Context, pathPoints: List<LatLng>, distance: Double, timeElapsed: Int, elevationGain: Double, steps: Int) {
         val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
+        val db = IPPTDatabase.getDatabase(context)
 
-        // Format run summary as a single entry
-        val runId = "run_${System.currentTimeMillis()}"
-        val runSummary = "Date: $timestamp | Distance: ${String.format("%.2f", distance)} km | Time: ${formatTime(timeElapsed)} | Elevation: ${String.format("%.1f", elevationGain)} m | Steps: $steps"
+        val runEntry = ExerciseEntry(
+            type = "run",
+            timestamp = timestamp,
+            summary = "Date: $timestamp | Distance: ${String.format("%.2f", distance)} km | Time: ${formatTime(timeElapsed)} | Elevation: ${String.format("%.1f", elevationGain)} m | Steps: $steps"
+        )
 
-        editor.putString("${runId}_summary", runSummary)
-        editor.putString("${runId}_path", serializePathPoints(pathPoints))
-
-        editor.apply()
+        CoroutineScope(Dispatchers.IO).launch {
+            val runId = db.exerciseDao().insertExercise(runEntry).toInt()
+            val pathPointsDb = pathPoints.map {
+                RunPathPoint(runId = runId, latitude = it.latitude, longitude = it.longitude)
+            }
+            db.runPathDao().insertPathPoints(pathPointsDb)
+        }
     }
+
 
     Scaffold(
         topBar = {
@@ -111,7 +119,10 @@ fun RunSummaryScreen(navController: NavController, viewModel: RunViewModel) {
             }
 
             Button(
-                onClick = { saveRunData(); viewModel.resetRunData(); navController.navigate("home") },
+                onClick = {
+                    saveRunData(context, pathPoints, distance, timeElapsed, elevationGain, steps)
+                    navController.navigate("profile")
+                },
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF5722))
             ) {

@@ -1,9 +1,13 @@
 package com.example.ippt.screens
 
+import com.example.ippt.data.ExerciseEntry
+import com.example.ippt.data.IPPTDatabase
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
-import android.content.SharedPreferences
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.media.MediaPlayer
@@ -52,7 +56,7 @@ import kotlin.math.atan2
 @Composable
 fun PushupTrackerScreen(navController: NavController) {
     val context = LocalContext.current
-    val sharedPreferences = context.getSharedPreferences("IPPT_DATA", Context.MODE_PRIVATE)
+    // val sharedPreferences removed (replaced with DAO)
     val activity = context as? Activity
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -97,12 +101,16 @@ fun PushupTrackerScreen(navController: NavController) {
     val primaryColor = MaterialTheme.colorScheme.primary
 
     // Function to save data
-    fun savePushupData(count: Int) {
-        val editor: SharedPreferences.Editor = sharedPreferences.edit()
-        val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
-        editor.putString("pushup_$timestamp", count.toString())
-        editor.apply()
+    
+fun savePushupData(context: Context, count: Int) {
+    val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
+    val db = IPPTDatabase.getDatabase(context)
+    val entry = ExerciseEntry(type = "pushup", timestamp = timestamp, count = count)
+    CoroutineScope(Dispatchers.IO).launch {
+        db.exerciseDao().insertExercise(entry)
     }
+}
+
 
 
     // Request camera permission
@@ -342,7 +350,7 @@ fun PushupTrackerScreen(navController: NavController) {
             text = { Text("You completed $pushUpCount push-ups. Do you want to save the session?") },
             confirmButton = {
                 Button(onClick = {
-                    savePushupData(pushUpCount)
+                    savePushupData(context, pushUpCount)
                     pushUpCount = 0
                     navController.navigate("profile")
                 }) {

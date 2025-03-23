@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    id("kotlin-kapt")
 }
 
 android {
@@ -54,6 +55,8 @@ dependencies {
     implementation(libs.vision.common)
     implementation(libs.pose.detection.common)
     implementation(libs.pose.detection)
+    implementation(libs.androidx.room.common)
+    implementation(libs.androidx.room.ktx)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -78,5 +81,9 @@ dependencies {
 
     //icons
     implementation("androidx.compose.material:material-icons-extended:1.4.3")
+
+    implementation (libs.androidx.room.runtime)
+    kapt ("androidx.room:room-compiler:2.6.1")
+    implementation (libs.androidx.room.ktx)
 
 }

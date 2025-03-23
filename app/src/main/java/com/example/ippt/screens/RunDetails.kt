@@ -1,4 +1,10 @@
 package com.example.ippt.screens
+import com.example.ippt.data.ExerciseEntry
+import com.example.ippt.data.RunPathPoint
+import com.example.ippt.data.IPPTDatabase
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 import android.content.Context
 import androidx.compose.foundation.layout.*
@@ -6,10 +12,17 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.*
@@ -18,15 +31,32 @@ import com.google.maps.android.compose.*
 @Composable
 fun RunDetailScreen(navController: NavController, runId: String) {
     val context = LocalContext.current
-    val sharedPreferences = context.getSharedPreferences("IPPT_DATA", Context.MODE_PRIVATE)
+    val db = IPPTDatabase.getDatabase(context)
+    val coroutineScope = rememberCoroutineScope()
 
-    val summary = sharedPreferences.getString("${runId}_summary", "No summary available") ?: ""
-    val pathRaw = sharedPreferences.getString("${runId}_path", "") ?: ""
-    val pathPoints = deserializePathPoints(pathRaw)
+    var summary by remember { mutableStateOf("Loading...") }
+    var pathPoints by remember { mutableStateOf<List<LatLng>>(emptyList()) }
 
-    val cameraPositionState = rememberCameraPositionState {
-        val lastLocation = pathPoints.lastOrNull() ?: LatLng(1.3521, 103.8198)
-        position = CameraPosition.fromLatLngZoom(lastLocation, 15f)
+    LaunchedEffect(runId) {
+        coroutineScope.launch {
+            val idInt = runId.removePrefix("run_").toIntOrNull()
+            if (idInt != null) {
+                val run = db.exerciseDao().getExercisesByType("run").find { it.id == idInt }
+                summary = run?.summary ?: "No summary available"
+                val points = db.runPathDao().getPathPoints(idInt)
+                pathPoints = points.map { LatLng(it.latitude, it.longitude) }
+            }
+        }
+    }
+
+    val cameraPositionState = rememberCameraPositionState()
+
+    LaunchedEffect(pathPoints) {
+        if (pathPoints.isNotEmpty()) {
+            cameraPositionState.move(
+                CameraUpdateFactory.newLatLngZoom(pathPoints.last(), 15f)
+            )
+        }
     }
 
     Scaffold(
@@ -63,20 +93,5 @@ fun RunDetailScreen(navController: NavController, runId: String) {
                 }
             }
         }
-    }
-}
-
-fun serializePathPoints(pathPoints: List<LatLng>): String {
-    return pathPoints.joinToString(";") { "${it.latitude},${it.longitude}" }
-}
-
-fun deserializePathPoints(data: String): List<LatLng> {
-    return data.split(";").mapNotNull {
-        val latLng = it.split(",")
-        if (latLng.size == 2) {
-            val lat = latLng[0].toDoubleOrNull()
-            val lng = latLng[1].toDoubleOrNull()
-            if (lat != null && lng != null) LatLng(lat, lng) else null
-        } else null
     }
 }

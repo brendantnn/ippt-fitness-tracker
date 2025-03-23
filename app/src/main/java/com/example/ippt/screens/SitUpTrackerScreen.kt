@@ -1,9 +1,13 @@
 package com.example.ippt.screens
+import com.example.ippt.data.ExerciseEntry
+import com.example.ippt.data.IPPTDatabase
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
-import android.content.SharedPreferences
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.util.Log
@@ -52,7 +56,7 @@ import kotlin.math.atan2
 @Composable
 fun SitupTrackerScreen(navController: NavController){
     val context = LocalContext.current
-    val sharedPreferences = context.getSharedPreferences("IPPT_DATA", Context.MODE_PRIVATE)
+    // val sharedPreferences removed (replaced with DAO)
 
     val activity = context as? Activity
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -62,10 +66,8 @@ fun SitupTrackerScreen(navController: NavController){
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-                enableImmersiveMode(activity)
             } else if (event == Lifecycle.Event.ON_PAUSE) {
                 activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-                disableImmersiveMode(activity)
             }
         }
 
@@ -108,12 +110,16 @@ fun SitupTrackerScreen(navController: NavController){
         }
     }
 
-    fun saveSitupData(count: Int) {
-        val editor: SharedPreferences.Editor = sharedPreferences.edit()
-        val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
-        editor.putString("situp_$timestamp", count.toString())
-        editor.apply()
+    
+fun saveSitupData(context: Context, count: Int) {
+    val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
+    val db = IPPTDatabase.getDatabase(context)
+    val entry = ExerciseEntry(type = "situp", timestamp = timestamp, count = count)
+    CoroutineScope(Dispatchers.IO).launch {
+        db.exerciseDao().insertExercise(entry)
     }
+}
+
 
     // Run once when enter recomposition and never reexecutes
     LaunchedEffect(Unit) {
@@ -276,7 +282,7 @@ fun SitupTrackerScreen(navController: NavController){
             text = { Text("You completed $sitUpCount push-ups. Do you want to save the session?") },
             confirmButton = {
                 Button(onClick = {
-                    saveSitupData(sitUpCount)
+                    saveSitupData(context, sitUpCount)
                     sitUpCount = 0
                     navController.navigate("profile")
                 }) {
@@ -511,21 +517,5 @@ fun SitUpOutline(modifier: Modifier = Modifier) {
             end = foot,
             strokeWidth = strokeWidth
         )
-    }
-}
-
-fun enableImmersiveMode(activity: Activity?) {
-    activity?.window?.let { window ->
-        val insetsController = ViewCompat.getWindowInsetsController(window.decorView)
-        insetsController?.hide(WindowInsetsCompat.Type.systemBars())
-        insetsController?.systemBarsBehavior =
-            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-    }
-}
-
-fun disableImmersiveMode(activity: Activity?) {
-    activity?.window?.let { window ->
-        val insetsController = ViewCompat.getWindowInsetsController(window.decorView)
-        insetsController?.show(WindowInsetsCompat.Type.systemBars())
     }
 }

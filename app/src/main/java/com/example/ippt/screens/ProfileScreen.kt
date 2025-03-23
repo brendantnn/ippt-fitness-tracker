@@ -1,6 +1,5 @@
 package com.example.ippt.screens
 
-import android.content.Context
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -11,48 +10,41 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import com.example.ippt.data.IPPTDatabase
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.*
-import java.text.SimpleDateFormat
-import java.util.*
 
 @Composable
 fun ProfileScreen(navController: NavController) {
     val context = LocalContext.current
-    val sharedPreferences = context.getSharedPreferences("IPPT_DATA", Context.MODE_PRIVATE)
 
     val runHistory = remember { mutableStateListOf<RunHistoryEntry>() }
     val pushupHistory = remember { mutableStateListOf<Pair<String, String>>() }
     val situpHistory = remember { mutableStateListOf<Pair<String, String>>() }
 
-    LaunchedEffect(Unit) {
-        val tempRunHistory = mutableListOf<RunHistoryEntry>()
-        val tempPushupHistory = mutableListOf<Pair<String, String>>()
-        val tempSitupHistory = mutableListOf<Pair<String, String>>()
+    val db = IPPTDatabase.getDatabase(context)
 
-        sharedPreferences.all.forEach { (key, value) ->
-            when {
-                key.endsWith("_summary") -> {
-                    val runId = key.removeSuffix("_summary")
-                    val summary = value.toString()
-                    val pathRaw = sharedPreferences.getString("${runId}_path", "") ?: ""
-                    val pathPoints = deserializePathPoints(pathRaw)
-                    tempRunHistory.add(RunHistoryEntry(runId, summary, pathPoints))
-                }
-                key.contains("pushup", ignoreCase = true) -> tempPushupHistory.add(Pair(key, value.toString()))
-                key.contains("situp", ignoreCase = true) -> tempSitupHistory.add(Pair(key, value.toString()))
+    LaunchedEffect(Unit) {
+        val runEntries = db.exerciseDao().getExercisesByType("run")
+        val pushupEntries = db.exerciseDao().getExercisesByType("pushup")
+        val situpEntries = db.exerciseDao().getExercisesByType("situp")
+
+        val runPathDao = db.runPathDao()
+        val fullRunData = runEntries.map { run ->
+            val pathPoints = runPathDao.getPathPoints(run.id).map {
+                LatLng(it.latitude, it.longitude)
             }
+            RunHistoryEntry(
+                runId = "run_${run.id}",
+                summary = run.summary ?: "",
+                pathPoints = pathPoints
+            )
         }
 
-        runHistory.clear()
-        runHistory.addAll(tempRunHistory.sortedByDescending { extractDateFromKeyOrId(it.summary) })
-
-        pushupHistory.clear()
-        pushupHistory.addAll(tempPushupHistory.sortedByDescending { extractDateFromKeyOrId(it.first) })
-
-        situpHistory.clear()
-        situpHistory.addAll(tempSitupHistory.sortedByDescending { extractDateFromKeyOrId(it.first) })
+        runHistory.addAll(fullRunData)
+        pushupHistory.addAll(pushupEntries.map { it.timestamp to "${it.count ?: 0}" })
+        situpHistory.addAll(situpEntries.map { it.timestamp to "${it.count ?: 0}" })
     }
 
     LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp)) {
@@ -123,16 +115,11 @@ fun RunHistoryCard(run: RunHistoryEntry, navController: NavController) {
 @Composable
 fun HistoryCard(key: String, value: String) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(8.dp),
+        modifier = Modifier.fillMaxWidth().padding(8.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = key.replace("_", " ").replaceFirstChar { it.uppercase() },
-                style = MaterialTheme.typography.bodyLarge
-            )
+            Text(text = key.replace("_", " ").replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.bodyLarge)
             Text(text = value, style = MaterialTheme.typography.bodyMedium)
         }
     }
@@ -143,25 +130,3 @@ data class RunHistoryEntry(
     val summary: String,
     val pathPoints: List<LatLng>
 )
-
-fun extractDateFromKeyOrId(key: String): Date {
-    val datePatterns = listOf(
-        "yyyy-MM-dd HH:mm:ss", // for pushup/situp like: pushup_2025-03-24 18:47:13
-        "yyyyMMdd",            // fallback pattern if using compact format
-        "yyyy-MM-dd"           // another fallback
-    )
-
-    val match = Regex("\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}").find(key)?.value
-        ?: Regex("\\d{8}").find(key)?.value
-        ?: Regex("\\d{4}-\\d{2}-\\d{2}").find(key)?.value
-        ?: return Date(0)
-
-    for (pattern in datePatterns) {
-        try {
-            val sdf = SimpleDateFormat(pattern, Locale.getDefault())
-            return sdf.parse(match) ?: Date(0)
-        } catch (_: Exception) {}
-    }
-
-    return Date(0) // fallback if parsing fails
-}
