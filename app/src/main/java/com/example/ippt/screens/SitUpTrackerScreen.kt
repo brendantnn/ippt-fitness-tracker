@@ -1,18 +1,15 @@
 package com.example.ippt.screens
 
-import android.R.attr.text
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
 import android.content.SharedPreferences
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
-import android.media.MediaPlayer
-import android.media.SoundPool
 import android.util.Log
-import android.view.ViewGroup
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.OptIn
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
@@ -32,19 +29,19 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.NavController
-import com.example.ippt.R
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.pose.PoseDetection
 import com.google.mlkit.vision.pose.PoseLandmark
 import com.google.mlkit.vision.pose.accurate.AccuratePoseDetectorOptions
-import com.google.mlkit.vision.pose.defaults.PoseDetectorOptions
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -65,8 +62,10 @@ fun SitupTrackerScreen(navController: NavController){
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                enableImmersiveMode(activity)
             } else if (event == Lifecycle.Event.ON_PAUSE) {
                 activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                disableImmersiveMode(activity)
             }
         }
 
@@ -82,27 +81,22 @@ fun SitupTrackerScreen(navController: NavController){
     val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
     var isCameraOn by remember { mutableStateOf(false) }
     var hasCameraPermission by remember { mutableStateOf(false) }
-    var sitUpCount by remember { mutableStateOf(0) }
-    var elbowAngle by remember { mutableStateOf(0.0) }
-    var backAngle by remember { mutableStateOf(0.0) }
-    var legAngle by remember { mutableStateOf(0.0) }
-    var hipAngle by remember { mutableStateOf(0.0) }
+    var sitUpCount by remember { mutableIntStateOf(0) }
+    var elbowAngle by remember { mutableDoubleStateOf(0.0) }
+    var backAngle by remember { mutableDoubleStateOf(0.0) }
+    var legAngle by remember { mutableDoubleStateOf(0.0) }
+    val hipAngle by remember { mutableDoubleStateOf(0.0) }
     var keyPoints by remember { mutableStateOf(emptyList<Pair<Float, Float>>()) }
-    var isUserReady by remember { mutableStateOf(false) }
-    var isBackStraight by remember { mutableStateOf(true) }
-    var firstPushUpDone by remember { mutableStateOf(false) }
+    val isBackStraight by remember { mutableStateOf(true) }
 
     // New state for 10s countdown timer
-    var countdownTimer by remember { mutableStateOf(3) }
+    var countdownTimer by remember { mutableIntStateOf(3) }
     var isCountingDown by remember { mutableStateOf(true) }
-    val coroutineScope = rememberCoroutineScope()
 
     // For 60 sec timer
-    var timeLeft by remember { mutableStateOf(60) }
+    var timeLeft by remember { mutableIntStateOf(60) }
     var isTimerRunning by remember { mutableStateOf(false) }
     var showSaveDialog by remember { mutableStateOf(false) }
-
-    val primaryColor = MaterialTheme.colorScheme.primary
 
     // Request camera permission
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
@@ -166,8 +160,8 @@ fun SitupTrackerScreen(navController: NavController){
         // Start camera preview if permission is granted
         if (hasCameraPermission) {
             val lifecycleOwner = LocalLifecycleOwner.current
-            CameraPreview2(context, lifecycleOwner, { isCountingDown }, cameraExecutor) {
-                    newCount, newBackAngle, newKeyPoints, isUp ->
+            CameraPreview2(context, lifecycleOwner, { isCountingDown }, isTimerRunning = { isTimerRunning }, cameraExecutor) {
+                    newCount, newBackAngle, newKeyPoints, _ ->
                 sitUpCount = newCount
                 backAngle = newBackAngle
                 keyPoints = newKeyPoints
@@ -286,7 +280,7 @@ fun SitupTrackerScreen(navController: NavController){
                     sitUpCount = 0
                     navController.navigate("profile")
                 }) {
-                    Text("Save")
+                    Text("Finish Set: ($sitUpCount sit ups)")
                 }
             },
             dismissButton = {
@@ -309,13 +303,14 @@ fun CameraPreview2(
     context: Context,
     lifecycleOwner: LifecycleOwner,
     isCountingDown: () -> Boolean,
+    isTimerRunning: () -> Boolean,
     cameraExecutor: ExecutorService,
     onDataUpdate: (Int, Double, List<Pair<Float, Float>>, Boolean) -> Unit
 ) {
     val previewView = remember { PreviewView(context) }
 
     LaunchedEffect(Unit) {
-        startCameras(previewView, context, lifecycleOwner, cameraExecutor, isCountingDown, onDataUpdate)
+        startCameras(previewView, context, lifecycleOwner, cameraExecutor, isCountingDown, isTimerRunning ,onDataUpdate)
     }
 
     AndroidView(
@@ -331,6 +326,7 @@ private fun startCameras(
     lifecycleOwner: LifecycleOwner,
     cameraExecutor: ExecutorService,
     isCountingDown: () -> Boolean,
+    isTimerRunning: () -> Boolean,
     onDataUpdate: (Int, Double, List<Pair<Float, Float>>, Boolean) -> Unit
 ) {
     val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
@@ -350,7 +346,7 @@ private fun startCameras(
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .build().also {
                     it.setAnalyzer(cameraExecutor) { imageProxy ->
-                        processSitUpDetection(imageProxy, context, isCountingDown) { newCount, newBackAngle, newKeyPoints, isUp ->
+                        processSitUpDetection(imageProxy, context, isCountingDown, isTimerRunning) { newCount, newBackAngle, newKeyPoints, isUp ->
                             onDataUpdate(newCount, newBackAngle, newKeyPoints, isUp)
                         }
                     }
@@ -395,10 +391,12 @@ fun getSitUpAngle(
 private var sitUpCount = 0 // Keep track of sit-ups
 private var wasGoingUp = false // Track upward movement
 
+@OptIn(ExperimentalGetImage::class)
 private fun processSitUpDetection(
     imageProxy: ImageProxy,
     context: Context,
     isCountingDown: () -> Boolean,
+    isTimerRunning: () -> Boolean,
     onDataUpdate: (Int, Double, List<Pair<Float, Float>>, Boolean) -> Unit
 ) {
     val mediaImage = imageProxy.image ?: return
@@ -436,7 +434,7 @@ private fun processSitUpDetection(
                 }.flatten()
 
                 var isUp = false
-                if (!isCountingDown()) {
+                if (!isCountingDown() && isTimerRunning()) {
                     if (backToHipAngle < 50) { // Sit-up "up" position
                         if (!wasGoingUp) {
                             sitUpCount++
@@ -516,31 +514,18 @@ fun SitUpOutline(modifier: Modifier = Modifier) {
     }
 }
 
-
-@Composable
-fun SitUpTrackerUI(
-    sitUpCount: Int,
-    backAngle: Double
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black)
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text(
-            text = "Sit-Ups: $sitUpCount",
-            style = MaterialTheme.typography.displayMedium,
-            color = Color.White
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = "Back Angle: ${backAngle.toInt()}°",
-            style = MaterialTheme.typography.bodyLarge,
-            color = Color.White
-        )
+fun enableImmersiveMode(activity: Activity?) {
+    activity?.window?.let { window ->
+        val insetsController = ViewCompat.getWindowInsetsController(window.decorView)
+        insetsController?.hide(WindowInsetsCompat.Type.systemBars())
+        insetsController?.systemBarsBehavior =
+            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
     }
 }
 
+fun disableImmersiveMode(activity: Activity?) {
+    activity?.window?.let { window ->
+        val insetsController = ViewCompat.getWindowInsetsController(window.decorView)
+        insetsController?.show(WindowInsetsCompat.Type.systemBars())
+    }
+}

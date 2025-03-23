@@ -3,18 +3,16 @@ package com.example.ippt.screens
 
 import android.content.Context
 import android.content.SharedPreferences
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -51,14 +49,12 @@ fun RunSummaryScreen(navController: NavController, viewModel: RunViewModel) {
         val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
 
         // Format run summary as a single entry
+        val runId = "run_${System.currentTimeMillis()}"
         val runSummary = "Date: $timestamp | Distance: ${String.format("%.2f", distance)} km | Time: ${formatTime(timeElapsed)} | Elevation: ${String.format("%.1f", elevationGain)} m | Steps: $steps"
 
-        // Retrieve existing run history
-        val existingData = sharedPreferences.getString("run_history", "") ?: ""
-        val updatedData = if (existingData.isEmpty()) runSummary else "$existingData\n$runSummary"
+        editor.putString("${runId}_summary", runSummary)
+        editor.putString("${runId}_path", serializePathPoints(pathPoints))
 
-        // Save the updated history
-        editor.putString("run_history", updatedData)
         editor.apply()
     }
 
@@ -68,7 +64,7 @@ fun RunSummaryScreen(navController: NavController, viewModel: RunViewModel) {
                 title = { Text("Run Summary") },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 }
             )

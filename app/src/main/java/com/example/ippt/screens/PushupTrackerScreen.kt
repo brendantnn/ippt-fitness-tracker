@@ -1,6 +1,5 @@
 package com.example.ippt.screens
 
-import android.R.attr.text
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
@@ -8,11 +7,10 @@ import android.content.SharedPreferences
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.media.MediaPlayer
-import android.media.SoundPool
 import android.util.Log
-import android.view.ViewGroup
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.OptIn
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
@@ -42,9 +40,7 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.pose.PoseDetection
 import com.google.mlkit.vision.pose.PoseLandmark
 import com.google.mlkit.vision.pose.accurate.AccuratePoseDetectorOptions
-import com.google.mlkit.vision.pose.defaults.PoseDetectorOptions
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -81,24 +77,20 @@ fun PushupTrackerScreen(navController: NavController) {
     val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
     var isCameraOn by remember { mutableStateOf(false) }
     var hasCameraPermission by remember { mutableStateOf(false) }
-    var pushUpCount by remember { mutableStateOf(0) }
-    var elbowAngle by remember { mutableStateOf(0.0) }
-    var backAngle by remember { mutableStateOf(0.0) }
-    var legAngle by remember { mutableStateOf(0.0) }
-    var hipAngle by remember { mutableStateOf(0.0) }
+    var pushUpCount by remember { mutableIntStateOf(0) }
+    var elbowAngle by remember { mutableDoubleStateOf(0.0) }
+    val legAngle by remember { mutableDoubleStateOf(0.0) }
+    var hipAngle by remember { mutableDoubleStateOf(0.0) }
     var keyPoints by remember { mutableStateOf(emptyList<Pair<Float, Float>>()) }
-    var isUserReady by remember { mutableStateOf(false) }
     var isBackStraight by remember { mutableStateOf(true) }
-    var firstPushUpDone by remember { mutableStateOf(false) }
 
 
     // New state for 10s countdown timer
-    var countdownTimer by remember { mutableStateOf(3) }
+    var countdownTimer by remember { mutableIntStateOf(3) }
     var isCountingDown by remember { mutableStateOf(true) }
-    val coroutineScope = rememberCoroutineScope()
 
     // For 60 sec timer
-    var timeLeft by remember { mutableStateOf(60) }
+    var timeLeft by remember { mutableIntStateOf(60) }
     var isTimerRunning by remember { mutableStateOf(false) }
     var showSaveDialog by remember { mutableStateOf(false) }
 
@@ -169,7 +161,7 @@ fun PushupTrackerScreen(navController: NavController) {
         // Start camera preview if permission is granted
         if (hasCameraPermission) {
                 val lifecycleOwner = LocalLifecycleOwner.current
-                CameraPreview(context, lifecycleOwner, { isCountingDown }, cameraExecutor) { newCount, newElbowAngle, newHipAngle, newKeyPoints, backStraight ->
+                CameraPreview(context, lifecycleOwner, { isCountingDown }, isTimerRunning = { isTimerRunning }, cameraExecutor) { newCount, newElbowAngle, newHipAngle, newKeyPoints, backStraight ->
                     pushUpCount = newCount
                     elbowAngle = newElbowAngle
                     hipAngle = newHipAngle
@@ -405,7 +397,6 @@ fun DrawSkeletonLines(
             boxSize / heightRange
         }
 
-        val centerX = size.width / 2
         val centerY = size.height / 2
 
         // **Fix: Mirror X-coordinates for Front Camera**
@@ -439,6 +430,7 @@ fun CameraPreview(
     context: Context,
     lifecycleOwner: LifecycleOwner,
     isCountingDown: () -> Boolean,
+    isTimerRunning: () -> Boolean,
     cameraExecutor: ExecutorService,
     onDataUpdate: (Int, Double, Double, List<Pair<Float, Float>>, Boolean) -> Unit
 ) {
@@ -447,7 +439,7 @@ fun CameraPreview(
 
     // Runs startCamera once
     LaunchedEffect(Unit) {
-        startCamera(previewView, context, lifecycleOwner, cameraExecutor, isCountingDown, onDataUpdate)
+        startCamera(previewView, context, lifecycleOwner, cameraExecutor, isCountingDown, isTimerRunning, onDataUpdate)
     }
 
     AndroidView(
@@ -462,6 +454,7 @@ private fun startCamera(
     lifecycleOwner: LifecycleOwner,
     cameraExecutor: ExecutorService,
     isCountingDown: () -> Boolean,
+    isTimerRunning: () -> Boolean,
     onDataUpdate: (Int, Double, Double, List<Pair<Float, Float>>, Boolean) -> Unit
 ) {
     val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
@@ -483,7 +476,7 @@ private fun startCamera(
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .build().also {
                     it.setAnalyzer(cameraExecutor) { imageProxy ->
-                        processPushUpDetection(imageProxy, context, isCountingDown) { newCount, newElbowAngle, newHipAngle, newKeyPoints, backStraight ->
+                        processPushUpDetection(imageProxy, context, isCountingDown, isTimerRunning) { newCount, newElbowAngle, newHipAngle, newKeyPoints, backStraight ->
                             // Always update state, but only count push-ups after countdown ends
                             onDataUpdate(newCount, newElbowAngle, newHipAngle, newKeyPoints, backStraight)
                         }
@@ -516,10 +509,12 @@ private var mediaPlayerBack: MediaPlayer? = null
 private var lastBackWarningTime = 0L  // To prevent frequent playback
 
 
+@OptIn(ExperimentalGetImage::class)
 private fun processPushUpDetection(
     imageProxy: ImageProxy,
     context: Context,
     isCountingDown: () -> Boolean,
+    isTimerRunning: () -> Boolean,
     onDataUpdate: (Int, Double, Double, List<Pair<Float, Float>>, Boolean) -> Unit  // ✅ Send keypoints
 ) {
     val mediaImage = imageProxy.image
@@ -572,14 +567,10 @@ private fun processPushUpDetection(
 
 
                     // Check for back straightness
-                    if (backAngle in 140.0..200.0 && legAngle in 160.0..200.0) {
-                        backStraight = true
-                    } else {
-                        backStraight = false
-                    }
+                    backStraight = backAngle in 140.0..200.0 && legAngle in 160.0..200.0
 
                     // ✅ Check dynamically if countdown is still running
-                    if (!isCountingDown()) {
+                    if (!isCountingDown() && isTimerRunning()) {
                         if (elbowAngle < 100 && hipAngle > 140) {
                             isGoingDown = true
                             wasGoingDown = true
@@ -672,7 +663,10 @@ fun PushUpOutline(modifier: Modifier = Modifier) {
         drawCircle(
             color = outlineColor,
             radius = headRadius,
-            center = Offset(size.width * 0.90f, size.height * 0.35f) // Head slightly above shoulders
+            center = Offset(
+                size.width * 0.90f,
+                size.height * 0.35f
+            ) // Head slightly above shoulders
         )
 
         // Draw Body (shoulders to hips)
@@ -694,35 +688,4 @@ fun PushUpOutline(modifier: Modifier = Modifier) {
 
 
     }
-}
-
-
-
-
-// Capture image from camera, converts it into InputImage format, then use ML kit's Pose Detection API to process frames,
-private fun processImageProxy(imageProxy: ImageProxy, context: Context) {
-    val mediaImage = imageProxy.image
-    if (mediaImage != null) {
-        val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
-        val options = PoseDetectorOptions.Builder()
-            .setDetectorMode(PoseDetectorOptions.STREAM_MODE)
-            .build()
-        val poseDetector = PoseDetection.getClient(options)
-
-        poseDetector.process(image)
-            .addOnSuccessListener { pose ->
-                // Implement push-up counting logic
-                Log.d("PushupScreen", "Pose Detected: ${pose.allPoseLandmarks}")
-            }
-            .addOnFailureListener { e ->
-                Log.e("PushupScreen", "Pose Detection Failed", e)
-            }
-            .addOnCompleteListener {
-                imageProxy.close()
-            }
-    }
-}
-
-fun setScreenOrientation(activity: Activity?, orientation: Int) {
-    activity?.requestedOrientation = orientation
 }

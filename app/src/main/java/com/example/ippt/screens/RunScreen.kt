@@ -1,5 +1,10 @@
 package com.example.ippt.screens
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -13,12 +18,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.*
@@ -31,11 +37,26 @@ fun RunScreen(navController: NavController, viewModel: RunViewModel = viewModel(
     val pace by viewModel.pace.collectAsState()
     val timeElapsed by viewModel.timeElapsed.collectAsState()
     val pathPoints by viewModel.pathPoints.collectAsState()
+    val isTracking by viewModel.isTracking.collectAsState()
 
+    val context = LocalContext.current
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (!isGranted) {
+            Toast.makeText(context, "Location permission is required for map features", Toast.LENGTH_SHORT).show()
+        }
+    }
     val cameraPositionState = rememberCameraPositionState()
-    var isTracking by remember { mutableStateOf(false) }
 
     LaunchedEffect(locationState) {
+        if (ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            permissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
         cameraPositionState.position = CameraPosition.fromLatLngZoom(
             LatLng(locationState.latitude, locationState.longitude), 15f
         )
@@ -109,12 +130,11 @@ fun RunScreen(navController: NavController, viewModel: RunViewModel = viewModel(
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
             Button(
                 onClick = {
-                    if (isTracking) {
-                        viewModel.pauseTracking()
-                    } else {
+                    if (isTracking) viewModel.pauseTracking()
+                    else {
+                        viewModel.resetRunData()
                         viewModel.startTracking()
                     }
-                    isTracking = !isTracking
                 },
                 modifier = Modifier.size(80.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
@@ -136,7 +156,12 @@ fun RunScreen(navController: NavController, viewModel: RunViewModel = viewModel(
                 colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
                 shape = CircleShape
             ) {
-                Icon(imageVector = Icons.Default.Stop, contentDescription = "Finish", tint = Color.White, modifier = Modifier.size(40.dp))
+                Icon(
+                    imageVector = Icons.Default.Stop,
+                    contentDescription = "Finish",
+                    tint = Color.White,
+                    modifier = Modifier.size(40.dp)
+                )
             }
         }
     }

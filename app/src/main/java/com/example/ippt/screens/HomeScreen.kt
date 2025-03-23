@@ -6,10 +6,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Accessibility
+import androidx.compose.material.icons.automirrored.filled.DirectionsRun
 import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.DirectionsRun
-import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -59,7 +57,7 @@ fun HomeScreen(navController: NavController) {
         GradientButton(
             imageRes = R.drawable.ic_sit_up, // Replace with the actual sit-up image resource
             text = "Sit-Up Tracker",
-            onClick = { navController.navigate("sit-up") }
+            onClick = { navController.navigate("situp") }
         )
         //Running
         Spacer(modifier = Modifier.weight(1f))
@@ -131,8 +129,8 @@ fun BottomNavBar(navController: NavController) {
     val items = listOf(
         NavItem("Home", "home", Icons.Filled.Home),
         NavItem("Pushups", "pushup", null), // Pushups now uses a custom image
-        NavItem("Situps", "sit-up", null),  // Situps also uses a custom image
-        NavItem("Run", "run", Icons.Filled.DirectionsRun),
+        NavItem("Situps", "situp", null),  // Situps also uses a custom image
+        NavItem("Run", "run", Icons.AutoMirrored.Filled.DirectionsRun),
         NavItem("Profile", "profile", Icons.Filled.AccountCircle)
     )
 

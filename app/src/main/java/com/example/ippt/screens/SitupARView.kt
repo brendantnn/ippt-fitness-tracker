@@ -19,7 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 
 @Composable
-fun ARView(navController: NavController) {
+fun SitupARView(navController: NavController) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -28,15 +28,15 @@ fun ARView(navController: NavController) {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Button(onClick = {
-            launchSceneViewer(navController.context)
+            launchSitupViewer(navController.context)
         }) {
             Text("View 3D Model in AR")
         }
     }
 }
 
-fun launchSceneViewer(context: Context) {
-    val modelUrl = "https://drive.google.com/uc?export=download&id=1d_DG6_on4Remq22-BW0sqvy54ooV09Kj" // Replace with your actual file ID
+fun launchSitupViewer(context: Context) {
+    val modelUrl = "https://drive.usercontent.google.com/u/0/uc?id=1bOUNNEVAgPsRSPbK8qzA7gFjaC36u3xU&export=download" // Replace with your actual file ID
 
     val intentUri = Uri.parse("https://arvr.google.com/scene-viewer/1.0")
         .buildUpon()

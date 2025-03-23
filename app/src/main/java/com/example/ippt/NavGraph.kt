@@ -27,11 +27,17 @@ fun NavGraph() {
             composable("home") { HomeScreen(navController) }
             composable("pushup") { PushupScreen(navController) }
             composable("pushup_tracker") { PushupTrackerScreen(navController) }
-            composable("ar_view") { ARView(navController) }
+            composable("pushup_ar_view") { PushupARView(navController) }
             composable("run") { RunScreen(navController, runViewModel) }
             composable("run_summary") { RunSummaryScreen(navController, runViewModel) }
-            composable("sit-up"){SitupTrackerScreen(navController)}
+            composable("situp"){ SitupScreen(navController) }
+            composable("situp_tracker"){SitupTrackerScreen(navController)}
+            composable("situp_ar_view"){ SitupARView(navController) }
             composable("profile") { ProfileScreen(navController)}
+            composable("runDetail/{runId}") { backStackEntry ->
+                val runId = backStackEntry.arguments?.getString("runId") ?: ""
+                RunDetailScreen(navController = navController, runId = runId)
+            }
         }
     }
 }
