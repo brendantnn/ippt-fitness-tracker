@@ -63,6 +63,8 @@ fun RunSummaryScreen(navController: NavController, viewModel: RunViewModel) {
             }
             db.runPathDao().insertPathPoints(pathPointsDb)
         }
+
+        viewModel.resetRunData()
     }
 
 
