@@ -10,6 +10,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
+import android.media.MediaPlayer
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -33,14 +34,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.NavController
+import com.example.ippt.R
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.pose.PoseDetection
 import com.google.mlkit.vision.pose.PoseLandmark
@@ -53,10 +52,18 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlin.math.atan2
 
+private var mediaPlayerCorrect: MediaPlayer? = null
+
+fun playCorrectSitupSound(context: Context) {
+    if (mediaPlayerCorrect == null) {
+        mediaPlayerCorrect = MediaPlayer.create(context, R.raw.correct)
+    }
+    mediaPlayerCorrect?.start()
+}
+
 @Composable
 fun SitupTrackerScreen(navController: NavController){
     val context = LocalContext.current
-    // val sharedPreferences removed (replaced with DAO)
 
     val activity = context as? Activity
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -111,15 +118,14 @@ fun SitupTrackerScreen(navController: NavController){
     }
 
     
-fun saveSitupData(context: Context, count: Int) {
-    val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
-    val db = IPPTDatabase.getDatabase(context)
-    val entry = ExerciseEntry(type = "situp", timestamp = timestamp, count = count)
-    CoroutineScope(Dispatchers.IO).launch {
-        db.exerciseDao().insertExercise(entry)
+    fun saveSitupData(context: Context, count: Int) {
+        val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
+        val db = IPPTDatabase.getDatabase(context)
+        val entry = ExerciseEntry(type = "situp", timestamp = timestamp, count = count)
+        CoroutineScope(Dispatchers.IO).launch {
+            db.exerciseDao().insertExercise(entry)
+        }
     }
-}
-
 
     // Run once when enter recomposition and never reexecutes
     LaunchedEffect(Unit) {
@@ -445,6 +451,7 @@ private fun processSitUpDetection(
                         if (!wasGoingUp) {
                             sitUpCount++
                             wasGoingUp = true
+                            playCorrectSitupSound(context)
                             Log.d("SitUpTracker", "Sit-Up Counted! Total: $sitUpCount")
                         }
                         isUp = true
