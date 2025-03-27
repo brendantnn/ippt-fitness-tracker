@@ -110,8 +110,7 @@ fun savePushupData(context: Context, count: Int) {
         db.exerciseDao().insertExercise(entry)
     }
 }
-
-
+    
 
     // Request camera permission
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
@@ -147,7 +146,6 @@ fun savePushupData(context: Context, count: Int) {
         countdownTimer = 0
         isCountingDown = false
     }
-
 
 
     // Start 60 second timer when 10 second timer ends

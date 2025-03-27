@@ -53,6 +53,8 @@ import java.util.concurrent.Executors
 import kotlin.math.atan2
 
 private var mediaPlayerCorrect: MediaPlayer? = null
+private var mediaPlayerSitupPosition: MediaPlayer? = null
+
 
 fun playCorrectSitupSound(context: Context) {
     if (mediaPlayerCorrect == null) {
@@ -60,6 +62,14 @@ fun playCorrectSitupSound(context: Context) {
     }
     mediaPlayerCorrect?.start()
 }
+
+fun playSitupPositionSound(context: Context) {
+    if (mediaPlayerSitupPosition == null) {
+        mediaPlayerSitupPosition = MediaPlayer.create(context, R.raw.situp)
+    }
+    mediaPlayerSitupPosition?.start()
+}
+
 
 @Composable
 fun SitupTrackerScreen(navController: NavController){
@@ -140,7 +150,7 @@ fun SitupTrackerScreen(navController: NavController){
         } else {
             cameraPermissionLauncher.launch(android.Manifest.permission.CAMERA)
         }
-        //playPositionSound(context)
+        playSitupPositionSound(context)
 
         // Start the 10-second countdown
         isCountingDown = true
@@ -163,6 +173,8 @@ fun SitupTrackerScreen(navController: NavController){
             }
             isTimerRunning = false
             showSaveDialog = true // Show save/discard options when time runs out
+            isCameraOn = false // Turn off the camera
+
         }
     }
 
@@ -170,7 +182,7 @@ fun SitupTrackerScreen(navController: NavController){
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
 
         // Start camera preview if permission is granted
-        if (hasCameraPermission) {
+        if (hasCameraPermission && isCameraOn) {
             val lifecycleOwner = LocalLifecycleOwner.current
             CameraPreview2(context, lifecycleOwner, { isCountingDown }, isTimerRunning = { isTimerRunning }, cameraExecutor) {
                     newCount, newBackAngle, newKeyPoints, _ ->
