@@ -279,7 +279,7 @@ fun saveSitupData(context: Context, count: Int) {
         AlertDialog(
             onDismissRequest = { showSaveDialog = false },
             title = { Text("Session Over") },
-            text = { Text("You completed $sitUpCount push-ups. Do you want to save the session?") },
+            text = { Text("You completed $sitUpCount sit-ups. Do you want to save the session?") },
             confirmButton = {
                 Button(onClick = {
                     saveSitupData(context, sitUpCount)
@@ -291,7 +291,7 @@ fun saveSitupData(context: Context, count: Int) {
             },
             dismissButton = {
                 Button(onClick = {
-                    sitUpCount = 0  // Reset push-up count
+                    sitUpCount = 0  // Reset sit-up count
                     showSaveDialog = false
                     navController.popBackStack()  // Navigate back
                 }) {
