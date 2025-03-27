@@ -2,6 +2,7 @@ package com.example.ippt.screens
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -41,14 +42,51 @@ fun RunScreen(navController: NavController, viewModel: RunViewModel = viewModel(
 
     val context = LocalContext.current
     val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (!isGranted) {
-            Toast.makeText(context, "Location permission is required for map features", Toast.LENGTH_SHORT).show()
-        }
-    }
-    val cameraPositionState = rememberCameraPositionState()
+        //contract = ActivityResultContracts.RequestPermission()
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ){ permissions ->
+        val fineLocationGranted = permissions[Manifest.permission.ACCESS_FINE_LOCATION]== true
+        val activityRecognitionGranted = permissions[Manifest.permission.ACTIVITY_RECOGNITION] == true
 
+        if(!fineLocationGranted){
+            Toast.makeText(context, "Location permission is required", Toast.LENGTH_SHORT).show()
+        }
+        if(!activityRecognitionGranted && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            Toast.makeText(context, "Activity recognition permission is required to track steps", Toast.LENGTH_SHORT).show()
+        }
+
+    }
+    // { isGranted ->
+       // if (!isGranted) {
+         //   Toast.makeText(context, "Location permission is required for map features", Toast.LENGTH_SHORT).show()
+        //}
+    //}
+    val cameraPositionState = rememberCameraPositionState()
+    LaunchedEffect(Unit) {
+        val permissionsToRequest = mutableListOf<String>()
+
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            permissionsToRequest.add(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACTIVITY_RECOGNITION)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            permissionsToRequest.add(Manifest.permission.ACTIVITY_RECOGNITION)
+        }
+
+        if (permissionsToRequest.isNotEmpty()) {
+            permissionLauncher.launch(permissionsToRequest.toTypedArray())
+        }
+
+        cameraPositionState.position = CameraPosition.fromLatLngZoom(
+            LatLng(locationState.latitude, locationState.longitude), 15f
+        )
+    }
+    /*
     LaunchedEffect(locationState) {
         if (ContextCompat.checkSelfPermission(
                 context,
@@ -60,7 +98,7 @@ fun RunScreen(navController: NavController, viewModel: RunViewModel = viewModel(
         cameraPositionState.position = CameraPosition.fromLatLngZoom(
             LatLng(locationState.latitude, locationState.longitude), 15f
         )
-    }
+    }*/
 
     Column(
         modifier = Modifier
