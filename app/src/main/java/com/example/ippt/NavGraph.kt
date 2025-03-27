@@ -16,8 +16,8 @@ fun NavGraph() {
     val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
 
     Scaffold(
-        topBar = { if (currentRoute !in listOf("sit-up", "pushup_tracker")) TopNavBar() },
-        bottomBar = { if (currentRoute !in listOf("sit-up", "pushup_tracker")) BottomNavBar(navController) }
+        topBar = { if (currentRoute !in listOf("situp_tracker", "pushup_tracker")) TopNavBar() },
+        bottomBar = { if (currentRoute !in listOf("situp_tracker", "pushup_tracker")) BottomNavBar(navController) }
     ) { paddingValues ->
         NavHost(
             navController = navController,
