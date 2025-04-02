@@ -154,7 +154,7 @@ fun SitupTrackerScreen(navController: NavController){
 
         // Start the 10-second countdown
         isCountingDown = true
-        for (i in 10 downTo 1) {
+        for (i in 15 downTo 1) {
             countdownTimer = i
             delay(1000L)
         }
