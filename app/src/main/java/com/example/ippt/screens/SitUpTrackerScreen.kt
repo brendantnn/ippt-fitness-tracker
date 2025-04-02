@@ -100,7 +100,6 @@ fun SitupTrackerScreen(navController: NavController){
     val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
     var isCameraOn by remember { mutableStateOf(false) }
     var hasCameraPermission by remember { mutableStateOf(false) }
-    var sitUpCount by remember { mutableIntStateOf(0) }
     var elbowAngle by remember { mutableDoubleStateOf(0.0) }
     var backAngle by remember { mutableDoubleStateOf(0.0) }
     var legAngle by remember { mutableDoubleStateOf(0.0) }

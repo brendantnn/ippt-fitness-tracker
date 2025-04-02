@@ -81,7 +81,6 @@ fun PushupTrackerScreen(navController: NavController) {
     val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
     var isCameraOn by remember { mutableStateOf(false) }
     var hasCameraPermission by remember { mutableStateOf(false) }
-    var pushUpCount by remember { mutableIntStateOf(0) }
     var elbowAngle by remember { mutableDoubleStateOf(0.0) }
     val legAngle by remember { mutableDoubleStateOf(0.0) }
     var hipAngle by remember { mutableDoubleStateOf(0.0) }
