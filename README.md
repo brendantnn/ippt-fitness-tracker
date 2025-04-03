@@ -10,7 +10,7 @@ Video Demonstration: https://youtu.be/ig2B8Un7O2M
 - **Push-up and Sit-up Rep Counting**: Automatically counts reps based on body angles using ML Kit Pose Detection.
 - **Running Tracker**: Tracks distance, time, and pace using the device’s GPS.
 - **Augmented Reality (AR)**: Provides real-time AR tutorials for proper push-up and sit-up form.
-- **Offline Support**: The app works entirely offline, making it accessible in outdoor or low-connectivity environments.
+- **Offline Support**: The app works entirely offline, making it accessible in outdoor or low-connectivity environments using Room Database.
 - **Real-Time Feedback**: Provides immediate visual and audio feedback to help correct posture and improve workout performance.
 
 ## Installation Instructions
