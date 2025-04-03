@@ -4,6 +4,8 @@
 
 The **Interactive Physical Proficiency Trainer** is a mobile fitness application designed to help users track their physical activities, such as running, push-ups, and sit-ups, using only their smartphones. It integrates real-time tracking, pose estimation for exercise validation, and augmented reality (AR) features to guide users in maintaining proper form during workouts. The app provides accurate metrics for running, exercise rep counting, and offers helpful tutorials to improve performance.
 
+Video Demonstration: https://youtu.be/ig2B8Un7O2M
+
 ### Key Features:
 - **Push-up and Sit-up Rep Counting**: Automatically counts reps based on body angles using ML Kit Pose Detection.
 - **Running Tracker**: Tracks distance, time, and pace using the device’s GPS.

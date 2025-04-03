@@ -24,7 +24,7 @@ fun SitupScreen(navController: NavController) {
     ) {
         // Title at the top
         Text(
-            text = "Push-Up Tracker\n",
+            text = "Sit-Up Tracker\n",
             style = MaterialTheme.typography.headlineLarge,
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.align(Alignment.Start).padding(bottom = 32.dp)
